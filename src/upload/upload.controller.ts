@@ -12,7 +12,6 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import { UploadService } from './upload.service';
-import { type ReqWithWallet } from '../auth/auth.interface';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5mb
 
@@ -24,7 +23,6 @@ export class UploadController {
   @UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async handleUploadZip(
-    @Req() req: ReqWithWallet,
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -47,7 +45,6 @@ export class UploadController {
   @UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async handleUploadFile(
-    @Req() req: ReqWithWallet,
     @UploadedFile(
       new ParseFilePipe({
         validators: [

@@ -13,13 +13,19 @@ const GANACHE_CONFIG: GanacheConfig = {
   rpcUrl: `http://${process.env.GANACHE_PRIMARY_HOST}:${process.env.GANACHE_PORT}`,
 };
 
-const createWallets = (config: GanacheConfig) => {
+const createWallets = async (config: GanacheConfig) => {
   const provider = new ethers.JsonRpcProvider(config.rpcUrl);
   const wallets: ethers.HDNodeWallet[] = [];
   const wallet = Wallet.fromPhrase(config.mnemonic, provider);
 
-  for (let i = 0; i < 10; i++) {
-    const hdWallet = wallet.derivePath(`m/44'/60'/0'/0/${i}`);
+  for (let i = 0; i < 5; i++) {
+    const hdWallet = wallet.deriveChild(i);
+    await (
+      await wallet.sendTransaction({
+        to: hdWallet.address,
+        value: ethers.parseEther('1'),
+      })
+    ).wait();
     wallets.push(hdWallet);
   }
 
@@ -27,19 +33,20 @@ const createWallets = (config: GanacheConfig) => {
 };
 
 export const testFixture = async () => {
-  const [deployer, owen, validator, random] = createWallets(GANACHE_CONFIG);
+  const [deployer, owen, validator, random] =
+    await createWallets(GANACHE_CONFIG);
 
-  const dataProvidersWhitelist = await new Whitelist__factory(deployer).deploy(
-    deployer.address,
-  );
+  const dataProvidersWhitelist = await (
+    await new Whitelist__factory(deployer).deploy(deployer.address)
+  ).waitForDeployment();
 
-  const validatorsWhitelist = await new Whitelist__factory(deployer).deploy(
-    deployer.address,
-  );
+  const validatorsWhitelist = await (
+    await new Whitelist__factory(deployer).deploy(deployer.address)
+  ).waitForDeployment();
 
-  const sequencerImplementation = await new DdexSequencer__factory(
-    deployer,
-  ).deploy();
+  const sequencerImplementation = await (
+    await new DdexSequencer__factory(deployer).deploy()
+  ).waitForDeployment();
 
   const sequencerInitializeArgs = (
     await sequencerImplementation.initialize.populateTransaction(
@@ -49,10 +56,12 @@ export const testFixture = async () => {
     )
   ).data;
 
-  const sequencerProxy = await new ERC1967Proxy__factory(deployer).deploy(
-    await sequencerImplementation.getAddress(),
-    sequencerInitializeArgs,
-  );
+  const sequencerProxy = await (
+    await new ERC1967Proxy__factory(deployer).deploy(
+      await sequencerImplementation.getAddress(),
+      sequencerInitializeArgs,
+    )
+  ).waitForDeployment();
 
   await (await dataProvidersWhitelist.addToWhitelist(owen.address)).wait();
   await (await validatorsWhitelist.addToWhitelist(validator.address)).wait();

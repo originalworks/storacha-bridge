@@ -16,7 +16,11 @@ export class UploadService {
   async uploadZip(filepath: string) {
     try {
       const extractPath = await this.unzip(filepath);
-      return await this.storachaService.uploadZip(extractPath);
+      const res = await this.storachaService.uploadZip(extractPath);
+
+      UploadService.logger.log({ textMsg: 'Response', res });
+
+      return res;
     } finally {
       await this.cleanup(filepath);
     }
@@ -31,7 +35,13 @@ export class UploadService {
         .pipe(Extract({ path: extractPath }))
         .promise();
     } catch (e) {
-      throw new BadRequestException('Failed to extract ZIP file');
+      const errorMsg = 'Failed to extract ZIP file';
+
+      UploadService.logger.error({
+        errorMsg,
+        originError: e,
+      });
+      throw new BadRequestException(errorMsg);
     }
 
     return extractPath;
@@ -40,7 +50,11 @@ export class UploadService {
   @PinoLoggerDecorator(UploadService.logger)
   async uploadFile(filepath: string) {
     try {
-      return await this.storachaService.uploadFile(filepath);
+      const res = await this.storachaService.uploadFile(filepath);
+
+      UploadService.logger.log({ textMsg: 'Response', res });
+
+      return res;
     } finally {
       await this.cleanup(filepath);
     }

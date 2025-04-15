@@ -23,7 +23,7 @@ export class AppInstance {
     if (!AppInstance.instance) {
       const appInstance = await NestFactory.create<NestExpressApplication>(
         AppModule,
-        { cors: true },
+        { cors: true, bufferLogs: true },
       );
       AppInstance.instance = createApp(appInstance);
     }

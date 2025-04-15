@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IStorachaBridgeConfig } from '../config/config';
 import { PinoLoggerDecorator } from '../pinoLogger/logger';
@@ -11,8 +17,11 @@ import { DdexSequencer__factory } from '../../contracts/ddexSequencer/DdexSequen
 @Injectable()
 export class AuthService {
   private static readonly logger = new Logger(AuthService.name);
-  private _whitelists: Record<ClientType, Whitelist>;
   private _provider: JsonRpcProvider;
+  private _whitelists: Record<ClientType, Whitelist> = {
+    OWEN: undefined,
+    VALIDATOR: undefined,
+  };
 
   constructor(
     private readonly configService: ConfigService<IStorachaBridgeConfig>,
@@ -46,25 +55,53 @@ export class AuthService {
   }
 
   @PinoLoggerDecorator(AuthService.logger)
-  public async isWhitelisted(address: string, client: ClientType) {
-    return this.getWhitelist[client].isWhitelisted(address);
+  async isWhitelisted(address: string, client: ClientType) {
+    try {
+      const whitelist = await this.getWhitelist(client);
+      const res = await whitelist.isWhitelisted(address);
+      AuthService.logger.log({
+        textMsg: 'Whitelisted Status',
+        status: { whitelist: whitelist.target, isWhitelisted: res },
+      });
+      return res;
+    } catch (e) {
+      AuthService.logger.error({ errorMsg: 'RPC Failure', originError: e });
+      throw new InternalServerErrorException(
+        'RPC Error. Please try again later',
+      );
+    }
   }
 
   @PinoLoggerDecorator(AuthService.logger)
-  public async parseToken(token: string): Promise<AuthInfo> {
+  async parseToken(token: string): Promise<AuthInfo> {
     const [client, signature] = token.split('::') ?? [];
 
     const typedClient = client as ClientType;
 
     if (typedClient !== 'OWEN' && typedClient !== 'VALIDATOR') {
-      throw new BadRequestException('Invalid client type in signed message');
+      throw new UnauthorizedException('Invalid client type in signed message');
     }
 
-    const walletAddress = ethers.verifyMessage(client, signature);
+    try {
+      const walletAddress = ethers.verifyMessage(client, signature);
 
-    return {
-      client: typedClient,
-      walletAddress,
-    };
+      AuthService.logger.log({
+        textMsg: 'Resolved wallet',
+        wallet: { walletAddress, typedClient },
+      });
+
+      return {
+        client: typedClient,
+        walletAddress,
+      };
+    } catch (e) {
+      AuthService.logger.error({
+        errorMsg: 'Failed to verify message',
+        originError: e,
+      });
+      throw new UnauthorizedException(
+        'Malformed signature in authorization header',
+      );
+    }
   }
 }

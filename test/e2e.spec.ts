@@ -11,10 +11,22 @@ import { AppModule } from '../src/app.module';
 import { ClientType } from '../src/auth/auth.interface';
 import { testFixture } from './fixture';
 import { IStorachaBridgeConfig } from '../src/config/config';
+import { StorachaService } from '../src/storacha/storacha.service';
 
 describe('AppController', () => {
   let app: INestApplication;
   let fixture: Awaited<ReturnType<typeof testFixture>>;
+
+  const storachaMock = {
+    uploadDirectory: jest
+      .fn()
+      .mockResolvedValue({ toString: () => 'mock-cid-dir' }),
+    uploadFile: jest
+      .fn()
+      .mockResolvedValue({ toString: () => 'mock-cid-file' }),
+    addSpace: jest.fn().mockResolvedValue({ did: () => 'did:mock' }),
+    setCurrentSpace: jest.fn(),
+  };
 
   const TEMP_PATH = join(__dirname, 'temp');
 
@@ -36,7 +48,7 @@ describe('AppController', () => {
               TEMP_PATH,
               NODE_ENV: 'test',
               STORACHA_KEY: process.env.STORACHA_KEY,
-              STORACHA_PROOF: process.env.STORACHA_KEY,
+              STORACHA_PROOF: process.env.STORACHA_PROOF,
               RPC_URL: fixture.rpcUrl,
               DDEX_SEQUENCER_ADDRESS: await fixture.sequencer.getAddress(),
             }),
@@ -47,16 +59,78 @@ describe('AppController', () => {
       ],
     }).compile();
 
+    const storachaService = module.get(StorachaService);
+    (storachaService as any)._client = storachaMock;
+
     app = module.createNestApplication();
     await app.init();
   });
 
   afterAll(async () => {
     await rm(TEMP_PATH, { recursive: true, force: true });
+    jest.clearAllMocks();
     await app.close();
   });
 
   describe('Storacha Bridge', () => {
+    describe('Auth', () => {
+      it('Fails without authorization header', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/w3up/dir')
+          .expect(401);
+
+        expect(res.text).toEqual(
+          `{"message":"Missing authorization header","error":"Unauthorized","statusCode":401}`,
+        );
+      });
+
+      it('Fails on malformed authorization header', async () => {
+        let res = await request(app.getHttpServer())
+          .post('/w3up/dir')
+          .set('authorization', 'HYDRAULIK::TOMASZ')
+          .expect(401);
+
+        expect(res.text).toEqual(
+          `{"message":"Invalid client type in signed message","error":"Unauthorized","statusCode":401}`,
+        );
+
+        res = await request(app.getHttpServer())
+          .post('/w3up/dir')
+          .set('authorization', 'OWEN::TOMASZ')
+          .expect(401);
+
+        expect(res.text).toEqual(
+          `{"message":"Malformed signature in authorization header","error":"Unauthorized","statusCode":401}`,
+        );
+      });
+
+      it('Fails on whitelist', async () => {
+        let res = await request(app.getHttpServer())
+          .post('/w3up/dir')
+          .set(
+            'authorization',
+            await getAuth('OWEN', fixture.wallets.validator),
+          )
+          .expect(401);
+
+        expect(res.text).toEqual(
+          `{"message":"Address ${fixture.wallets.validator.address} is not whitelisted on OWEN whitelist","error":"Unauthorized","statusCode":401}`,
+        );
+
+        res = await request(app.getHttpServer())
+          .post('/w3up/dir')
+          .set(
+            'authorization',
+            await getAuth('VALIDATOR', fixture.wallets.owen),
+          )
+          .expect(401);
+
+        expect(res.text).toEqual(
+          `{"message":"Address ${fixture.wallets.owen.address} is not whitelisted on VALIDATOR whitelist","error":"Unauthorized","statusCode":401}`,
+        );
+      });
+    });
+
     describe('Upload controller', () => {
       describe('/POST w3up/dir', () => {
         it('Rejects when no file attached', async () => {
@@ -71,7 +145,7 @@ describe('AppController', () => {
         });
 
         it('Rejects non zip files', async () => {
-          const file = join(__dirname, '../../test/test.jpeg');
+          const file = join(__dirname, './test.jpeg');
 
           const res = await request(app.getHttpServer())
             .post('/w3up/dir')
@@ -85,7 +159,7 @@ describe('AppController', () => {
         });
 
         it.only('Processes zip', async () => {
-          const file = join(__dirname, '../../test/test.zip');
+          const file = join(__dirname, './test.zip');
 
           const res = await request(app.getHttpServer())
             .post('/w3up/dir')
@@ -114,7 +188,7 @@ describe('AppController', () => {
         });
 
         it('Rejects non image files', async () => {
-          const file = join(__dirname, '../../test/test.zip');
+          const file = join(__dirname, './test.zip');
 
           const res = await request(app.getHttpServer())
             .post('/w3up/file')
@@ -128,7 +202,7 @@ describe('AppController', () => {
         });
 
         it('Processes file', async () => {
-          const file = join(__dirname, '../../test/test.jpeg');
+          const file = join(__dirname, './test.jpeg');
 
           const res = await request(app.getHttpServer())
             .post('/w3up/file')

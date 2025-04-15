@@ -19,7 +19,6 @@ export class AuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException('Missing authorization header');
     }
-
     const { client, walletAddress } = await this.authService.parseToken(token);
 
     (request as ReqWithWallet).walletAddress = walletAddress;
@@ -31,9 +30,10 @@ export class AuthGuard implements CanActivate {
     );
 
     if (!isWhitelisted) {
-      throw new UnauthorizedException('Wallet address is not whitelisted');
+      throw new UnauthorizedException(
+        `Address ${walletAddress} is not whitelisted on ${client} whitelist`,
+      );
     }
-
     return true;
   }
 }
