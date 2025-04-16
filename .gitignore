@@ -3,7 +3,8 @@
 /node_modules
 /build
 /test/temp
-
+/infrastructure/out
+/infrastructure/storacha-bridge.zip
 # Logs
 logs
 *.log

@@ -10,8 +10,10 @@ import { rm } from 'fs/promises';
 import { AppModule } from '../src/app.module';
 import { ClientType } from '../src/auth/auth.interface';
 import { testFixture } from './fixture';
-import { IStorachaBridgeConfig } from '../src/config/config';
+import { IConfig } from '../src/config/config';
 import { StorachaService } from '../src/storacha/storacha.service';
+import { Secrets } from '../src/awsSecrets/awsSecrets.module';
+import { ISecrets } from '../src/awsSecrets/awsSecrets.interface';
 
 describe('AppController', () => {
   let app: INestApplication;
@@ -44,12 +46,10 @@ describe('AppController', () => {
       imports: [
         ConfigModule.forRoot({
           load: [
-            async (): Promise<IStorachaBridgeConfig> => ({
+            async (): Promise<IConfig> => ({
               TEMP_PATH,
-              NODE_ENV: 'test',
-              STORACHA_KEY: process.env.STORACHA_KEY,
-              STORACHA_PROOF: process.env.STORACHA_PROOF,
-              RPC_URL: fixture.rpcUrl,
+              SECRETS_PATH: 'secrets-path',
+              ENVIRONMENT: 'test',
               DDEX_SEQUENCER_ADDRESS: await fixture.sequencer.getAddress(),
             }),
           ],
@@ -57,7 +57,14 @@ describe('AppController', () => {
         }),
         AppModule,
       ],
-    }).compile();
+    })
+      .overrideProvider(Secrets)
+      .useValue({
+        RPC_URL: fixture.rpcUrl,
+        STORACHA_KEY: 'ABC',
+        STORACHA_PROOF: 'ABC',
+      } as ISecrets)
+      .compile();
 
     const storachaService = module.get(StorachaService);
     (storachaService as any)._client = storachaMock;
@@ -158,7 +165,7 @@ describe('AppController', () => {
           );
         });
 
-        it.only('Processes zip', async () => {
+        it('Processes zip', async () => {
           const file = join(__dirname, './test.zip');
 
           const res = await request(app.getHttpServer())

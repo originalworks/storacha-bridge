@@ -1,0 +1,7 @@
+{
+  "Parameters": {
+    "Environment": "devel",
+    "DdexSequencerAddress": "0x75AbeCf07C26368F0f4AA0b0d3637A732E25467e",
+    "AutoPublishAlias": "DevStorachaBridge"
+  }
+}

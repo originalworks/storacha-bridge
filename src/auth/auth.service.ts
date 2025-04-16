@@ -1,18 +1,20 @@
 import {
-  BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IStorachaBridgeConfig } from '../config/config';
+import { IConfig } from '../config/config';
 import { PinoLoggerDecorator } from '../pinoLogger/logger';
 import { ethers, JsonRpcProvider } from 'ethers';
 import type { AuthInfo, ClientType } from './auth.interface';
-import { Whitelist } from '../../contracts/whitelist/Whitelist';
-import { Whitelist__factory } from '../../contracts/whitelist/Whitelist__factory';
-import { DdexSequencer__factory } from '../../contracts/ddexSequencer/DdexSequencer__factory';
+import { Whitelist } from '../contracts/whitelist/Whitelist';
+import { Whitelist__factory } from '../contracts/whitelist/Whitelist__factory';
+import { DdexSequencer__factory } from '../contracts/ddexSequencer/DdexSequencer__factory';
+import { Secrets } from '../awsSecrets/awsSecrets.module';
+import { type ISecrets } from '../awsSecrets/awsSecrets.interface';
 
 @Injectable()
 export class AuthService {
@@ -24,9 +26,11 @@ export class AuthService {
   };
 
   constructor(
-    private readonly configService: ConfigService<IStorachaBridgeConfig>,
+    @Inject(Secrets)
+    private readonly secrets: ISecrets,
+    private readonly configService: ConfigService<IConfig>,
   ) {
-    this._provider = new JsonRpcProvider(this.configService.get('RPC_URL'));
+    this._provider = new JsonRpcProvider(this.secrets.RPC_URL);
   }
 
   private async getWhitelist(type: ClientType) {

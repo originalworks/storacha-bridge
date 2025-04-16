@@ -1,17 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
-import path, { join } from 'path';
+import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
-import { IStorachaBridgeConfig } from '../config/config';
+import { IConfig } from '../config/config';
 import { MulterModuleOptions } from '@nestjs/platform-express';
 import { mkdirSync } from 'fs';
 
 @Injectable()
 export class MulterConfigProvider {
-  constructor(
-    private readonly configService: ConfigService<IStorachaBridgeConfig>,
-  ) {}
+  constructor(private readonly configService: ConfigService<IConfig>) {}
   getMulterConfig(): MulterModuleOptions {
     const TEMP_PATH = this.configService.get('TEMP_PATH');
 

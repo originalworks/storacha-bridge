@@ -1,7 +1,7 @@
 import { ethers, Wallet, ZeroAddress } from 'ethers';
-import { Whitelist__factory } from '../contracts/whitelist/Whitelist__factory';
-import { DdexSequencer__factory } from '../contracts/ddexSequencer/DdexSequencer__factory';
-import { ERC1967Proxy__factory } from '../contracts/ERC1967Proxy/ERC1967Proxy__factory';
+import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
+import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
+import { ERC1967Proxy__factory } from '../src/contracts/ERC1967Proxy/ERC1967Proxy__factory';
 
 interface GanacheConfig {
   mnemonic: string;

@@ -1,15 +1,18 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IStorachaBridgeConfig } from '../config/config';
+import { IConfig } from '../config/config';
 import { filesFromPaths } from './filesFromPath';
 import type { Client } from '@web3-storage/w3up-client' with { 'resolution-mode': 'import' };
 import { UploadResponse } from './storacha.types';
 import { PinoLoggerDecorator } from '../pinoLogger/logger';
+import { Secrets } from '../awsSecrets/awsSecrets.module';
+import { type ISecrets } from '../awsSecrets/awsSecrets.interface';
 
 @Injectable()
 export class StorachaService {
@@ -17,7 +20,9 @@ export class StorachaService {
   private _client: Client;
 
   constructor(
-    private readonly configService: ConfigService<IStorachaBridgeConfig>,
+    @Inject(Secrets)
+    private readonly secrets: ISecrets,
+    private readonly configService: ConfigService<IConfig>,
   ) {}
 
   @PinoLoggerDecorator(StorachaService.logger)
@@ -34,10 +39,10 @@ export class StorachaService {
       const { Signer } = await import(
         '@web3-storage/w3up-client/principal/ed25519'
       );
-      const principal = Signer.parse(this.configService.get('STORACHA_KEY'));
+      const principal = Signer.parse(this.secrets.STORACHA_KEY);
       const store = new StoreMemory();
       this._client = await create({ principal, store });
-      const proof = await parse(this.configService.get('STORACHA_PROOF'));
+      const proof = await parse(this.secrets.STORACHA_PROOF);
       const space = await this._client.addSpace(proof);
       await this._client.setCurrentSpace(space.did());
     } catch (e) {
