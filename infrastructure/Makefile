@@ -16,6 +16,6 @@ cleanup:
 	rm -rf out && \
 	rm -rf $(ARTIFACT_NAME)
 
-zip: cleanup
+storacha-bridge.zip: cleanup
 	npm run esbuild && \
 	zip $@ -r out/storacha-bridge/*.js
