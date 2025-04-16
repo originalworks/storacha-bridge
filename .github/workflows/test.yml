@@ -1,0 +1,31 @@
+name: "storacha bridge tests"
+
+on: 
+  pull_request:
+    paths:
+      - 'src/**'
+  
+jobs:
+  dynamic-modular-metadata-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+      - name: "Setup Node"
+        uses: actions/setup-node@v3
+        with:
+            node-version: 22.14
+
+      - name: "Setup environment"
+        run: npm i -g jq.node
+        shell: bash
+
+      - name: "Bootstrap"
+        run: npm i
+        shell: bash
+
+      - name: "run tests"
+        run: docker compose -f docker/test-runner.yaml run test-runner
