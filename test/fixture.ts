@@ -45,7 +45,7 @@ async function confirmTx(
   let res: BaseContract | TransactionReceipt;
 
   if ('wait' in awaited) {
-    res = await awaited.wait();
+    res = await awaited.wait(1);
   } else {
     res = await awaited.waitForDeployment();
   }
@@ -79,6 +79,7 @@ const createWallets = async (config: GanacheConfig) => {
 export const testFixture = async () => {
   const [deployer, owen, validator, random] =
     await createWallets(GANACHE_CONFIG);
+
   const dataProvidersWhitelist = await confirmTx(
     new Whitelist__factory(deployer).deploy(deployer.address),
     deployer,
@@ -110,14 +111,17 @@ export const testFixture = async () => {
     deployer,
   );
 
-  await confirmTx(
+  const rec1 = await confirmTx(
     dataProvidersWhitelist.addToWhitelist(owen.address),
     deployer,
   );
-  await confirmTx(
+  console.log(rec1);
+
+  const rec2 = await confirmTx(
     validatorsWhitelist.addToWhitelist(validator.address),
     deployer,
   );
+  console.log(rec2);
 
   return {
     sequencer: sequencerProxy,
