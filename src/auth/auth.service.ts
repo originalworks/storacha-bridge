@@ -42,12 +42,13 @@ export class AuthService {
       this.configService.get('DDEX_SEQUENCER_ADDRESS'),
       this._provider,
     );
-
+    console.log('FETCHING WHITELIST ID');
     const whitelistId =
       type === 'OWEN'
         ? await sequencer.DATA_PROVIDERS_WHITELIST()
         : await sequencer.VALIDATORS_WHITELIST();
 
+    console.log('FETCHING WHITELIST ADDRESS');
     const whitelistAddress = await sequencer.whitelists(whitelistId);
 
     this._whitelists[type] = Whitelist__factory.connect(
@@ -62,7 +63,9 @@ export class AuthService {
   async isWhitelisted(address: string, client: ClientType) {
     try {
       const whitelist = await this.getWhitelist(client);
+      console.log('FETCHING ISWHITELISTED');
       const res = await whitelist.isWhitelisted(address);
+      console.log('DONE');
       AuthService.logger.log({
         textMsg: 'Whitelisted Status',
         status: { whitelist: whitelist.target, isWhitelisted: res },

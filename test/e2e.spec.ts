@@ -82,10 +82,11 @@ describe('AppController', () => {
   describe('Storacha Bridge', () => {
     describe('Auth', () => {
       it('Fails without authorization header', async () => {
+        console.log('First test');
         const res = await request(app.getHttpServer())
           .post('/w3up/dir')
           .expect(401);
-
+        console.log('After first test');
         expect(res.text).toEqual(
           `{"message":"Missing authorization header","error":"Unauthorized","statusCode":401}`,
         );
