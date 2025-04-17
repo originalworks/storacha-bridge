@@ -110,18 +110,23 @@ export const testFixture = async () => {
     ),
     deployer,
   );
-
-  const rec1 = await confirmTx(
-    dataProvidersWhitelist.addToWhitelist(owen.address),
-    deployer,
-  );
+  console.log('Whitelist 1');
+  const tx1 = await dataProvidersWhitelist.addToWhitelist(owen.address);
+  console.log(tx1);
+  const rec1 = tx1.wait(2);
   console.log(rec1);
+  console.log('Done whitelist 1');
 
-  const rec2 = await confirmTx(
-    validatorsWhitelist.addToWhitelist(validator.address),
-    deployer,
-  );
+  console.log('whitelist 2');
+  const tx2 = await validatorsWhitelist.addToWhitelist(validator.address);
+  console.log(tx2);
+  const rec2 = await tx2.wait(2);
   console.log(rec2);
+  console.log('Done whitelist 2');
+  // const rec2 = await confirmTx(
+  //   validatorsWhitelist.addToWhitelist(validator.address),
+  //   deployer,
+  // );
 
   return {
     sequencer: sequencerProxy,
