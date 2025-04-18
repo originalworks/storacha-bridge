@@ -4,10 +4,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { join } from 'path';
-import { HDNodeWallet } from 'ethers';
+import { JsonRpcSigner } from 'ethers';
 import { ConfigModule } from '@nestjs/config';
 import { rm } from 'fs/promises';
-import { AppModule } from '../src/app.module';
+import { TestAppModule } from '../src/app.module';
 import { ClientType } from '../src/auth/auth.interface';
 import { testFixture } from './fixture';
 import { IConfig } from '../src/config/config';
@@ -32,7 +32,7 @@ describe('AppController', () => {
 
   const TEMP_PATH = join(__dirname, 'temp');
 
-  const getAuth = async (client: ClientType, wallet: HDNodeWallet) => {
+  const getAuth = async (client: ClientType, wallet: JsonRpcSigner) => {
     const signature = await wallet.signMessage(client);
     const auth = [client, signature].join('::');
 
@@ -55,12 +55,12 @@ describe('AppController', () => {
           ],
           isGlobal: true,
         }),
-        AppModule,
+        TestAppModule,
       ],
     })
       .overrideProvider(Secrets)
       .useValue({
-        RPC_URL: fixture.rpcUrl,
+        RPC_URL: fixture.hardhatNode.rpcUrl,
         STORACHA_KEY: 'ABC',
         STORACHA_PROOF: 'ABC',
       } as ISecrets)
@@ -77,16 +77,15 @@ describe('AppController', () => {
     await rm(TEMP_PATH, { recursive: true, force: true });
     jest.clearAllMocks();
     await app.close();
+    fixture.hardhatNode.stopHardhatNode();
   });
 
   describe('Storacha Bridge', () => {
     describe('Auth', () => {
       it('Fails without authorization header', async () => {
-        console.log('First test');
         const res = await request(app.getHttpServer())
           .post('/w3up/dir')
           .expect(401);
-        console.log('After first test');
         expect(res.text).toEqual(
           `{"message":"Missing authorization header","error":"Unauthorized","statusCode":401}`,
         );
