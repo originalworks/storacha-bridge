@@ -7,7 +7,7 @@ name: "storacha bridge tests"
   
 on:
     workflow_dispatch:
-        
+
 jobs:
   dynamic-modular-metadata-test:
     runs-on: ubuntu-latest
@@ -23,7 +23,9 @@ jobs:
             node-version: 22.14
 
       - name: "Setup environment"
-        run: npm i -g jq.node
+        run: |
+            npm i -g jq.node
+            sudo apt-get update && sudo apt-get install -y lsof
         shell: bash
 
       - name: "Bootstrap"
@@ -31,4 +33,7 @@ jobs:
         shell: bash
 
       - name: "run tests"
-        run: docker compose -f docker/test-runner.yaml run test-runner
+        run: npm run test
+
+    #   - name: "run tests"
+    #     run: docker compose -f docker/test-runner.yaml run test-runner
