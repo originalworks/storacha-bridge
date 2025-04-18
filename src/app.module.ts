@@ -26,15 +26,3 @@ const providers: Provider[] = [
   providers,
 })
 export class AppModule {}
-
-@Module({
-  imports: [
-    ConfigModule.forRoot({
-      load: [config],
-      isGlobal: true,
-    }),
-    UploadModule,
-  ],
-  providers,
-})
-export class TestAppModule {}

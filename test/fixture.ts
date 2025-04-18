@@ -1,4 +1,4 @@
-import { ethers, parseEther, ZeroAddress } from 'ethers';
+import { ethers, ZeroAddress } from 'ethers';
 import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
 import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
 import { ERC1967Proxy__factory } from '../src/contracts/ERC1967Proxy/ERC1967Proxy__factory';

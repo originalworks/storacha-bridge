@@ -4,7 +4,7 @@ const HARDHAT_NODE_ADDRESS = '127.0.0.1:8545';
 export const HARDHART_NODE_RPC_URL = `http://${HARDHAT_NODE_ADDRESS}`;
 
 export interface HardhatNode {
-  stopHardhatNode: () => void;
+  stopHardhatNode: () => Promise<void>;
   rpcUrl: string;
 }
 
@@ -40,6 +40,7 @@ const stopHardhatNode = async () => {
       execSync(`lsof -ti @${HARDHAT_NODE_ADDRESS}`).toString().trim(),
       10,
     );
+    console.log(`KILLING ${pid}`);
     process.kill(pid);
   } catch {}
 };
@@ -65,5 +66,5 @@ export const startHardhatNode = async (): Promise<HardhatNode> => {
     await sleep(500);
   }
 
-  throw new Error('Cannot esablish connection with HardhatNode');
+  throw new Error('Cannot establish connection with HardhatNode');
 };

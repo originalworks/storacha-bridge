@@ -7,7 +7,7 @@ import { join } from 'path';
 import { JsonRpcSigner } from 'ethers';
 import { ConfigModule } from '@nestjs/config';
 import { rm } from 'fs/promises';
-import { TestAppModule } from '../src/app.module';
+import { AppModule } from '../src/app.module';
 import { ClientType } from '../src/auth/auth.interface';
 import { testFixture } from './fixture';
 import { IConfig } from '../src/config/config';
@@ -55,7 +55,7 @@ describe('AppController', () => {
           ],
           isGlobal: true,
         }),
-        TestAppModule,
+        AppModule,
       ],
     })
       .overrideProvider(Secrets)
@@ -77,7 +77,7 @@ describe('AppController', () => {
     await rm(TEMP_PATH, { recursive: true, force: true });
     jest.clearAllMocks();
     await app.close();
-    fixture.hardhatNode.stopHardhatNode();
+    await fixture.hardhatNode.stopHardhatNode();
   });
 
   describe('Storacha Bridge', () => {

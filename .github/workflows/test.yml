@@ -23,9 +23,8 @@ jobs:
             node-version: 22.14
 
       - name: "Setup environment"
-        run: |
-            npm i -g jq.node
-            sudo apt-get update && sudo apt-get install -y lsof
+        run: npm i -g jq.node
+
         shell: bash
 
       - name: "Bootstrap"
