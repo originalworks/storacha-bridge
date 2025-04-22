@@ -110,20 +110,33 @@ export const testFixture = async () => {
     ),
     deployer,
   );
-
-  let nonce = await deployer.getNonce('pending');
+  const iface = Whitelist__factory.createInterface();
 
   await confirmTx(
-    dataProvidersWhitelist.addToWhitelist(owen.address, { nonce }),
+    deployer.sendTransaction({
+      to: await dataProvidersWhitelist.getAddress(),
+      data: iface.encodeFunctionData('addToWhitelist', [owen.address]),
+    }),
     deployer,
   );
 
-  nonce = await deployer.getNonce('pending');
+  // await confirmTx(
+  //   dataProvidersWhitelist.addToWhitelist(owen.address),
+  //   deployer,
+  // );
 
   await confirmTx(
-    validatorsWhitelist.addToWhitelist(validator.address, { nonce }),
+    deployer.sendTransaction({
+      to: await validatorsWhitelist.getAddress(),
+      data: iface.encodeFunctionData('addToWhitelist', [validator.address]),
+    }),
     deployer,
   );
+
+  // await confirmTx(
+  //   validatorsWhitelist.addToWhitelist(validator.address),
+  //   deployer,
+  // );
 
   return {
     sequencer: sequencerProxy,
