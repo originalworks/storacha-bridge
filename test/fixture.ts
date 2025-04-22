@@ -9,6 +9,7 @@ import {
 import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
 import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
 import { ERC1967Proxy__factory } from '../src/contracts/ERC1967Proxy/ERC1967Proxy__factory';
+import { sleep } from './hardhatNode';
 
 interface GanacheConfig {
   mnemonic: string;
@@ -47,7 +48,7 @@ async function confirmTx(
   let res: BaseContract | TransactionReceipt;
 
   if ('wait' in awaited) {
-    res = await awaited.wait(1);
+    res = await awaited.wait();
   } else {
     res = await awaited.waitForDeployment();
   }
@@ -58,7 +59,7 @@ async function confirmTx(
   return res;
 }
 
-const lineupNonces = async (signer: Signer, expected = 0) => {
+const lineupNonces = async (signer: Signer, expected?: number) => {
   let noncesMatch = false;
 
   while (noncesMatch === false) {
@@ -68,12 +69,15 @@ const lineupNonces = async (signer: Signer, expected = 0) => {
     console.log(`Checking nonces. Latest: ${latest}, Pending: ${pending}`);
 
     if (latest === pending) {
-      console.log(`Nonces are in line: ${pending}`);
-      if (expected) {
-        console.log(`Expected:, ${expected}`);
+      console.log(
+        `Nonces are in line: ${pending}.${expected ? ` Expected ${expected}` : ''}`,
+      );
+      if (!expected || expected === pending) {
+        noncesMatch = true;
       }
-      noncesMatch = true;
     }
+
+    sleep(500);
   }
 };
 
@@ -100,6 +104,8 @@ export const testFixture = async () => {
   const [deployer, owen, validator, random] =
     await createWallets(GANACHE_CONFIG);
 
+  const nonceCt = await deployer.getNonce('pending');
+
   const dataProvidersWhitelist = await confirmTx(
     new Whitelist__factory(deployer).deploy(deployer.address),
     deployer,
@@ -123,7 +129,7 @@ export const testFixture = async () => {
     )
   ).data;
 
-  await lineupNonces(deployer);
+  await lineupNonces(deployer, nonceCt + 3);
 
   const sequencerProxy = await confirmTx(
     new ERC1967Proxy__factory(deployer).deploy(
@@ -133,12 +139,14 @@ export const testFixture = async () => {
     deployer,
   );
 
-  await lineupNonces(deployer);
+  await lineupNonces(deployer, nonceCt + 4);
 
   await confirmTx(
     dataProvidersWhitelist.addToWhitelist(owen.address),
     deployer,
   );
+
+  await lineupNonces(deployer, nonceCt + 5);
 
   await confirmTx(
     validatorsWhitelist.addToWhitelist(validator.address),
