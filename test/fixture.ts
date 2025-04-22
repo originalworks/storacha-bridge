@@ -111,12 +111,17 @@ export const testFixture = async () => {
     deployer,
   );
 
+  let nonce = await deployer.getNonce('pending');
+
   await confirmTx(
-    dataProvidersWhitelist.addToWhitelist(owen.address),
+    dataProvidersWhitelist.addToWhitelist(owen.address, { nonce }),
     deployer,
   );
+
+  nonce = await deployer.getNonce('pending');
+
   await confirmTx(
-    validatorsWhitelist.addToWhitelist(validator.address),
+    validatorsWhitelist.addToWhitelist(validator.address, { nonce }),
     deployer,
   );
 
