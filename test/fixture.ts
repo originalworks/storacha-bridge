@@ -5,7 +5,6 @@ import {
   TransactionReceipt,
   TransactionResponse,
   Wallet,
-  ZeroAddress,
 } from 'ethers';
 import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
 import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
@@ -37,8 +36,11 @@ async function confirmTx(
 ): Promise<BaseContract | TransactionReceipt> {
   const address = await signer.getAddress();
   const nonceBefore = await signer.getNonce();
+  const noncePending = await signer.getNonce('pending');
 
-  console.log(`Signer ${address} - Nonce before: ${nonceBefore}`);
+  console.log(
+    `Signer ${address} - Nonce before: ${nonceBefore}, Pending: ${noncePending}`,
+  );
 
   const awaited = await contractOrTx;
 
@@ -56,19 +58,37 @@ async function confirmTx(
   return res;
 }
 
+const lineupNonces = async (signer: Signer, expected = 0) => {
+  let noncesMatch = false;
+
+  while (noncesMatch === false) {
+    const latest = await signer.getNonce('latest');
+    const pending = await signer.getNonce('pending');
+
+    console.log(`Checking nonces. Latest: ${latest}, Pending: ${pending}`);
+
+    if (latest === pending) {
+      console.log(`Nonces are in line: ${pending}`);
+      if (expected) {
+        console.log(`Expected:, ${expected}`);
+      }
+      noncesMatch = true;
+    }
+  }
+};
+
 const createWallets = async (config: GanacheConfig) => {
   const provider = new ethers.JsonRpcProvider(config.rpcUrl);
   const wallets: ethers.HDNodeWallet[] = [];
   const wallet = Wallet.fromPhrase(config.mnemonic, provider);
   for (let i = 0; i < 4; i++) {
     const hdWallet = wallet.deriveChild(i);
-    await confirmTx(
-      wallet.sendTransaction({
+    await (
+      await wallet.sendTransaction({
         to: hdWallet.address,
         value: ethers.parseEther('1'),
-      }),
-      wallet,
-    );
+      })
+    ).wait();
 
     wallets.push(hdWallet);
   }
@@ -99,9 +119,11 @@ export const testFixture = async () => {
     await sequencerImplementation.initialize.populateTransaction(
       await dataProvidersWhitelist.getAddress(),
       await validatorsWhitelist.getAddress(),
-      ZeroAddress,
+      random.address,
     )
   ).data;
+
+  await lineupNonces(deployer);
 
   const sequencerProxy = await confirmTx(
     new ERC1967Proxy__factory(deployer).deploy(
@@ -110,36 +132,18 @@ export const testFixture = async () => {
     ),
     deployer,
   );
-  const iface = Whitelist__factory.createInterface();
-  const tst = await dataProvidersWhitelist.DEFAULT_ADMIN_ROLE();
 
-  console.log(tst);
+  await lineupNonces(deployer);
 
   await confirmTx(
-    deployer.sendTransaction({
-      to: await dataProvidersWhitelist.getAddress(),
-      data: iface.encodeFunctionData('addToWhitelist', [owen.address]),
-    }),
+    dataProvidersWhitelist.addToWhitelist(owen.address),
     deployer,
   );
 
-  // await confirmTx(
-  //   dataProvidersWhitelist.addToWhitelist(owen.address),
-  //   deployer,
-  // );
-
   await confirmTx(
-    deployer.sendTransaction({
-      to: await validatorsWhitelist.getAddress(),
-      data: iface.encodeFunctionData('addToWhitelist', [validator.address]),
-    }),
+    validatorsWhitelist.addToWhitelist(validator.address),
     deployer,
   );
-
-  // await confirmTx(
-  //   validatorsWhitelist.addToWhitelist(validator.address),
-  //   deployer,
-  // );
 
   return {
     sequencer: sequencerProxy,
