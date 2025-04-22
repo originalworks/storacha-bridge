@@ -32,7 +32,4 @@ jobs:
         shell: bash
 
       - name: "run tests"
-        run: npm run test
-
-    #   - name: "run tests"
-    #     run: docker compose -f docker/test-runner.yaml run test-runner
+        run: docker compose -f docker/test-runner.yaml run test-runner

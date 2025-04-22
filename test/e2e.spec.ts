@@ -1,10 +1,10 @@
-jest.setTimeout(50000);
+jest.setTimeout(100000);
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { join } from 'path';
-import { JsonRpcSigner } from 'ethers';
+import { HDNodeWallet } from 'ethers';
 import { ConfigModule } from '@nestjs/config';
 import { rm } from 'fs/promises';
 import { AppModule } from '../src/app.module';
@@ -32,7 +32,7 @@ describe('AppController', () => {
 
   const TEMP_PATH = join(__dirname, 'temp');
 
-  const getAuth = async (client: ClientType, wallet: JsonRpcSigner) => {
+  const getAuth = async (client: ClientType, wallet: HDNodeWallet) => {
     const signature = await wallet.signMessage(client);
     const auth = [client, signature].join('::');
 
@@ -60,7 +60,7 @@ describe('AppController', () => {
     })
       .overrideProvider(Secrets)
       .useValue({
-        RPC_URL: fixture.hardhatNode.rpcUrl,
+        RPC_URL: fixture.rpcUrl,
         STORACHA_KEY: 'ABC',
         STORACHA_PROOF: 'ABC',
       } as ISecrets)
@@ -77,7 +77,7 @@ describe('AppController', () => {
     await rm(TEMP_PATH, { recursive: true, force: true });
     jest.clearAllMocks();
     await app.close();
-    await fixture.hardhatNode.stopHardhatNode();
+    // await fixture.hardhatNode.stopHardhatNode();
   });
 
   describe('Storacha Bridge', () => {

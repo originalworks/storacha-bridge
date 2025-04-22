@@ -1,33 +1,99 @@
-import { ethers, ZeroAddress } from 'ethers';
+import {
+  BaseContract,
+  ethers,
+  Signer,
+  TransactionReceipt,
+  TransactionResponse,
+  Wallet,
+  ZeroAddress,
+} from 'ethers';
 import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
 import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
 import { ERC1967Proxy__factory } from '../src/contracts/ERC1967Proxy/ERC1967Proxy__factory';
-import { startHardhatNode } from './hardhatNode';
 
-const createWallets = async (rpcUrl: string) => {
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const accounts = await provider.listAccounts();
+interface GanacheConfig {
+  mnemonic: string;
+  rpcUrl: string;
+}
 
-  return accounts;
+const GANACHE_CONFIG: GanacheConfig = {
+  mnemonic: process.env.GANACHE_PRIMARY_MNEMONIC,
+  rpcUrl: `http://${process.env.GANACHE_PRIMARY_HOST}:${process.env.GANACHE_PORT}`,
+};
+
+async function confirmTx<T extends TransactionResponse>(
+  contractOrTx: Promise<T>,
+  signer: Signer,
+): Promise<TransactionReceipt>;
+
+async function confirmTx<T extends BaseContract>(
+  contractOrTx: Promise<T>,
+  signer: Signer,
+): Promise<T>;
+
+async function confirmTx(
+  contractOrTx: Promise<BaseContract | TransactionResponse>,
+  signer: Signer,
+): Promise<BaseContract | TransactionReceipt> {
+  const address = await signer.getAddress();
+  const nonceBefore = await signer.getNonce();
+
+  console.log(`Signer ${address} - Nonce before: ${nonceBefore}`);
+
+  const awaited = await contractOrTx;
+
+  let res: BaseContract | TransactionReceipt;
+
+  if ('wait' in awaited) {
+    res = await awaited.wait(1);
+  } else {
+    res = await awaited.waitForDeployment();
+  }
+
+  const nonceAfter = await signer.getNonce();
+  console.log(`Signer ${address} - Nonce after: ${nonceAfter}`);
+
+  return res;
+}
+
+const createWallets = async (config: GanacheConfig) => {
+  const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+  const wallets: ethers.HDNodeWallet[] = [];
+  const wallet = Wallet.fromPhrase(config.mnemonic, provider);
+  for (let i = 0; i < 4; i++) {
+    const hdWallet = wallet.deriveChild(i);
+    await confirmTx(
+      wallet.sendTransaction({
+        to: hdWallet.address,
+        value: ethers.parseEther('1'),
+      }),
+      wallet,
+    );
+
+    wallets.push(hdWallet);
+  }
+
+  return wallets;
 };
 
 export const testFixture = async () => {
-  const hardhatNode = await startHardhatNode();
-  const [deployer, owen, validator, random] = await createWallets(
-    hardhatNode.rpcUrl,
-  );
+  const [deployer, owen, validator, random] =
+    await createWallets(GANACHE_CONFIG);
 
-  const dataProvidersWhitelist = await new Whitelist__factory(deployer).deploy(
-    deployer.address,
-  );
-
-  const validatorsWhitelist = await new Whitelist__factory(deployer).deploy(
-    deployer.address,
-  );
-
-  const sequencerImplementation = await new DdexSequencer__factory(
+  const dataProvidersWhitelist = await confirmTx(
+    new Whitelist__factory(deployer).deploy(deployer.address),
     deployer,
-  ).deploy();
+  );
+
+  const validatorsWhitelist = await confirmTx(
+    new Whitelist__factory(deployer).deploy(deployer.address),
+    deployer,
+  );
+
+  const sequencerImplementation = await confirmTx(
+    new DdexSequencer__factory(deployer).deploy(),
+    deployer,
+  );
 
   const sequencerInitializeArgs = (
     await sequencerImplementation.initialize.populateTransaction(
@@ -37,19 +103,28 @@ export const testFixture = async () => {
     )
   ).data;
 
-  const sequencerProxy = await new ERC1967Proxy__factory(deployer).deploy(
-    await sequencerImplementation.getAddress(),
-    sequencerInitializeArgs,
+  const sequencerProxy = await confirmTx(
+    new ERC1967Proxy__factory(deployer).deploy(
+      await sequencerImplementation.getAddress(),
+      sequencerInitializeArgs,
+    ),
+    deployer,
   );
 
-  await (await dataProvidersWhitelist.addToWhitelist(owen.address)).wait();
-  await (await validatorsWhitelist.addToWhitelist(validator.address)).wait();
+  await confirmTx(
+    dataProvidersWhitelist.addToWhitelist(owen.address),
+    deployer,
+  );
+  await confirmTx(
+    validatorsWhitelist.addToWhitelist(validator.address),
+    deployer,
+  );
 
   return {
     sequencer: sequencerProxy,
     validatorsWhitelist,
     dataProvidersWhitelist,
-    hardhatNode,
+    rpcUrl: GANACHE_CONFIG.rpcUrl,
     wallets: {
       deployer,
       owen,
