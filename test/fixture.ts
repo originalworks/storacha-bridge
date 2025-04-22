@@ -111,6 +111,9 @@ export const testFixture = async () => {
     deployer,
   );
   const iface = Whitelist__factory.createInterface();
+  const tst = await dataProvidersWhitelist.DEFAULT_ADMIN_ROLE();
+
+  console.log(tst);
 
   await confirmTx(
     deployer.sendTransaction({
