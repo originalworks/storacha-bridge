@@ -1,12 +1,9 @@
 name: "Storacha Bridge tests"
 
-# on: 
-#   pull_request:
-#     paths:
-#       - 'src/**'
-  
-on:
-    workflow_dispatch:
+on: 
+  pull_request:
+    paths:
+      - 'src/**'
 
 jobs:
   storacha-bridge-tests:
