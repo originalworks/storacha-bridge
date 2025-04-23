@@ -31,7 +31,7 @@ jobs:
         run: npm i
         shell: bash
 
-      - name: Debug permissions
-        run: docker compose -f docker/test-runner.yaml run test-runner bash -c "whoami && ls -la /app"
-      # - name: "run tests"
-      #   run: docker compose -f docker/test-runner.yaml run test-runner
+      # - name: Debug permissions
+      #   run: docker compose -f docker/test-runner.yaml run test-runner bash -c "whoami && ls -la /app"
+      - name: "run tests"
+        run: docker compose -f docker/test-runner.yaml run test-runner

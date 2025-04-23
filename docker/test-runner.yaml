@@ -9,7 +9,7 @@ services:
         GID: ${GID:-1000}
     volumes:
       - ..:/app
-    user: node
+    # user: node
     working_dir: /app
     environment:
       STORACHA_KEY: abcd
