@@ -32,6 +32,4 @@ jobs:
         shell: bash
 
       - name: "run tests"
-        run: |
-          docker compose build --build-arg UID=$(id -u) --build-arg GID=$(id -g)
-          docker compose -f ./docker/test-runner.yaml run test-runner
+        run: UID=${id -u} GID=${id -g} docker compose -f docker/test-runner.yaml run test-runner
