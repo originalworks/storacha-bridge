@@ -1,12 +1,9 @@
 name: Deploy
 
-# on:
-#   push:
-#     tags:
-#       - "*"
-
 on:
-    workflow_dispatch:
+  push:
+    tags:
+      - "*"
 
 permissions:
   id-token: write
