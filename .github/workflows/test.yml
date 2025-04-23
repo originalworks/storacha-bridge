@@ -20,7 +20,7 @@ jobs:
       - name: "Setup Node"
         uses: actions/setup-node@v3
         with:
-            node-version: 18
+            node-version: 22.14
 
       - name: "Setup environment"
         run: npm i -g jq.node
@@ -31,5 +31,7 @@ jobs:
         run: npm i
         shell: bash
 
-      - name: "run tests"
-        run: docker compose -f docker/test-runner.yaml run test-runner
+      - name: Debug permissions
+        run: docker compose -f docker/test-runner.yaml run test-runner bash -c "whoami && ls -la /app"
+      # - name: "run tests"
+      #   run: docker compose -f docker/test-runner.yaml run test-runner

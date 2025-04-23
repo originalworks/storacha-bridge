@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:22.14-bookworm
 
 ARG UID=1000
 ARG GID=1000
@@ -10,5 +10,3 @@ RUN \
     chown -R node:node /app /home/node
 
 WORKDIR /app
-
-# RUN npm install -g aws-sdk node-lambda jq.node lerna@^7 spectaql bun

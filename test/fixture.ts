@@ -24,24 +24,38 @@ const GANACHE_CONFIG: GanacheConfig = {
 async function confirmTx<T extends TransactionResponse>(
   contractOrTx: Promise<T>,
   signer: Signer,
+  expectedNonce?: number,
 ): Promise<TransactionReceipt>;
 
 async function confirmTx<T extends BaseContract>(
   contractOrTx: Promise<T>,
   signer: Signer,
+  expectedNonce?: number,
 ): Promise<T>;
 
 async function confirmTx(
   contractOrTx: Promise<BaseContract | TransactionResponse>,
   signer: Signer,
+  expectedNonce?: number,
 ): Promise<BaseContract | TransactionReceipt> {
-  const address = await signer.getAddress();
-  const nonceBefore = await signer.getNonce();
-  const noncePending = await signer.getNonce('pending');
+  let noncesMatch = false;
+  let retCt = 0;
 
-  console.log(
-    `Signer ${address} - Nonce before: ${nonceBefore}, Pending: ${noncePending}`,
-  );
+  while (noncesMatch === false) {
+    if (retCt >= 10) {
+      throw new Error('Cannot lineup nonces, aborting');
+    }
+    const latest = await signer.getNonce('latest');
+    const pending = await signer.getNonce('pending');
+
+    if (latest === pending) {
+      if (!expectedNonce || expectedNonce === pending) {
+        noncesMatch = true;
+      }
+    }
+    retCt++;
+    sleep(500);
+  }
 
   const awaited = await contractOrTx;
 
@@ -53,38 +67,14 @@ async function confirmTx(
     res = await awaited.waitForDeployment();
   }
 
-  const nonceAfter = await signer.getNonce();
-  console.log(`Signer ${address} - Nonce after: ${nonceAfter}`);
-
   return res;
 }
-
-const lineupNonces = async (signer: Signer, expected?: number) => {
-  let noncesMatch = false;
-
-  while (noncesMatch === false) {
-    const latest = await signer.getNonce('latest');
-    const pending = await signer.getNonce('pending');
-
-    console.log(`Checking nonces. Latest: ${latest}, Pending: ${pending}`);
-
-    if (latest === pending) {
-      console.log(
-        `Nonces are in line: ${pending}.${expected ? ` Expected ${expected}` : ''}`,
-      );
-      if (!expected || expected === pending) {
-        noncesMatch = true;
-      }
-    }
-
-    sleep(500);
-  }
-};
 
 const createWallets = async (config: GanacheConfig) => {
   const provider = new ethers.JsonRpcProvider(config.rpcUrl);
   const wallets: ethers.HDNodeWallet[] = [];
   const wallet = Wallet.fromPhrase(config.mnemonic, provider);
+
   for (let i = 0; i < 4; i++) {
     const hdWallet = wallet.deriveChild(i);
     await (
@@ -129,28 +119,25 @@ export const testFixture = async () => {
     )
   ).data;
 
-  await lineupNonces(deployer, nonceCt + 3);
-
   const sequencerProxy = await confirmTx(
     new ERC1967Proxy__factory(deployer).deploy(
       await sequencerImplementation.getAddress(),
       sequencerInitializeArgs,
     ),
     deployer,
+    nonceCt + 3,
   );
-
-  await lineupNonces(deployer, nonceCt + 4);
 
   await confirmTx(
     dataProvidersWhitelist.addToWhitelist(owen.address),
     deployer,
+    nonceCt + 4,
   );
-
-  await lineupNonces(deployer, nonceCt + 5);
 
   await confirmTx(
     validatorsWhitelist.addToWhitelist(validator.address),
     deployer,
+    nonceCt + 5,
   );
 
   return {
