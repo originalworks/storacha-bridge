@@ -26,6 +26,10 @@ await esbuild.build({
   platform: 'node',
   target: 'node22',
   outdir: 'infrastructure/out/storacha-bridge',
+  loader: {
+    // ensures .node binaries are copied to ./dist
+    '.node': 'copy',
+  },
   plugins: [esbuildPluginTsc(), ...uploadSourceMapToSentry()],
   external: [
     '@aws-sdk/*',
