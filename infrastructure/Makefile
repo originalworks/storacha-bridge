@@ -18,4 +18,5 @@ cleanup:
 
 storacha-bridge.zip: cleanup
 	npm run esbuild && \
-	zip $@ -r out/storacha-bridge/*.js
+	find out/storacha-bridge -type f \( -name "*.js" -o -name "*.js.map" -o -name "*sentry_cpu_profiler-linux-x64-glibc*" \) \
+	| zip $@ -@
