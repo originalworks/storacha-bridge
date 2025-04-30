@@ -28,8 +28,9 @@ export class UploadService {
 
   private async unzip(filepath: string): Promise<string> {
     const extractPath = join(parse(filepath).dir, 'content');
+    console.log('Probuje zrobic folder', extractPath);
     await mkdir(extractPath, { recursive: true });
-
+    console.log('Unzipuje');
     try {
       await createReadStream(filepath)
         .pipe(Extract({ path: extractPath }))
@@ -37,6 +38,7 @@ export class UploadService {
     } catch (e) {
       const errorMsg = 'Failed to extract ZIP file';
 
+      console.log(e);
       UploadService.logger.error({
         errorMsg,
         originError: e,
