@@ -1,10 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { createReadStream } from 'fs';
 import { mkdir, rm } from 'fs/promises';
 import { parse, join } from 'path';
-import { Extract } from 'unzipper';
 import { StorachaService } from '../storacha/storacha.service';
 import { PinoLoggerDecorator } from '../pinoLogger/logger';
+import AdmZip from 'adm-zip';
 
 @Injectable()
 export class UploadService {
@@ -18,7 +17,10 @@ export class UploadService {
       const extractPath = await this.unzip(filepath);
       const res = await this.storachaService.uploadZip(extractPath);
 
-      UploadService.logger.log({ textMsg: 'Response', res });
+      UploadService.logger.log({
+        textMsg: 'Response',
+        response: JSON.stringify(res),
+      });
 
       return res;
     } finally {
@@ -32,16 +34,13 @@ export class UploadService {
     await mkdir(extractPath, { recursive: true });
     console.log('Unzipuje');
     try {
-      await createReadStream(filepath)
-        .pipe(Extract({ path: extractPath }))
-        .promise();
+      new AdmZip(filepath).extractAllTo(extractPath, true);
     } catch (e) {
       const errorMsg = 'Failed to extract ZIP file';
 
-      console.log(e);
       UploadService.logger.error({
         errorMsg,
-        originError: e,
+        originError: JSON.stringify(e),
       });
       throw new BadRequestException(errorMsg);
     }
@@ -54,7 +53,10 @@ export class UploadService {
     try {
       const res = await this.storachaService.uploadFile(filepath);
 
-      UploadService.logger.log({ textMsg: 'Response', res });
+      UploadService.logger.log({
+        textMsg: 'Response',
+        response: JSON.stringify(res),
+      });
 
       return res;
     } finally {

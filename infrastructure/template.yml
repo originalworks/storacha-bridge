@@ -28,6 +28,9 @@ Resources:
     Properties:
       Name: StorachaBridge
       StageName: !Ref Environment
+      BinaryMediaTypes:
+        - multipart/form-data
+        - application/zip
       MethodSettings:
         - ResourcePath: "/*"
           HttpMethod: "*"

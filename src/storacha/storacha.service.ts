@@ -48,7 +48,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to initialize Storacha',
-        originError: e,
+        originError: JSON.stringify(e),
       });
       throw new InternalServerErrorException(
         'Storacha init error. Please try again later',
@@ -78,7 +78,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to upload files to Storacha',
-        originError: e,
+        originError: JSON.stringify(e),
       });
       throw new InternalServerErrorException(
         'Failed to upload files to Storacha',
@@ -118,7 +118,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to upload files to Storacha',
-        originError: e,
+        originError: JSON.stringify(e),
       });
       throw new InternalServerErrorException(
         'Failed to upload file to Storacha',
