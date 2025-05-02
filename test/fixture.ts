@@ -9,7 +9,10 @@ import {
 import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
 import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
 import { ERC1967Proxy__factory } from '../src/contracts/ERC1967Proxy/ERC1967Proxy__factory';
-import { sleep } from './hardhatNode';
+
+export function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface GanacheConfig {
   mnemonic: string;

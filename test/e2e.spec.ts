@@ -77,7 +77,6 @@ describe('AppController', () => {
     await rm(TEMP_PATH, { recursive: true, force: true });
     jest.clearAllMocks();
     await app.close();
-    // await fixture.hardhatNode.stopHardhatNode();
   });
 
   describe('Storacha Bridge', () => {
