@@ -30,9 +30,9 @@ export class UploadService {
 
   private async unzip(filepath: string): Promise<string> {
     const extractPath = join(parse(filepath).dir, 'content');
-    console.log('Probuje zrobic folder', extractPath);
+
     await mkdir(extractPath, { recursive: true });
-    console.log('Unzipuje');
+
     try {
       new AdmZip(filepath).extractAllTo(extractPath, true);
     } catch (e) {
