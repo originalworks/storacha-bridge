@@ -8,6 +8,14 @@ Parameters:
     Type: String
   AutoPublishAlias:
     Type: String
+  StorachaBridgeDBName:
+    Type: String
+  DbHost:
+    Type: AWS::SSM::Parameter::Value<String>
+  DbSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+  RootDbName:
+    Type: AWS::SSM::Parameter::Value<String>
 
 Globals:
   Function:
@@ -21,6 +29,20 @@ Globals:
         SECRETS_PATH: !Sub ${Environment}/StorachaBridge
         DDEX_SEQUENCER_ADDRESS: !Ref DdexSequencerAddress
         NO_COLOR: true
+        DB_HOST: !Ref DbHost
+        DB_PORT: "5432"
+        DB_USER: !Join
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - !Ref DbSecret
+            - ":SecretString:username}}"
+        DB_PASSWORD: !Join
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - !Ref DbSecret
+            - ":SecretString:password}}"
+        DB_SYNCRONIZE: "false"
+        DB_DATABASE: !Ref StorachaBridgeDBName
 
 Resources:
   Api:
@@ -44,6 +66,10 @@ Resources:
       MemorySize: 512
       AutoPublishAlias: !Ref AutoPublishAlias
       # ReservedConcurrentExecutions: 1
+      DeploymentPreference:
+        Type: AllAtOnce
+        Hooks:
+          PreTraffic: !Ref RunMigrations
       Events:
         NestJs:
           Type: Api
@@ -51,6 +77,21 @@ Resources:
             RestApiId: !Ref Api
             Path: /{whatever+}
             Method: ANY
+      Policies:
+        - SecretsManagerReadWrite
+
+  RunMigrations:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "CodeDeployHook_StorachaBridge-${Environment}-RunMigrations"
+      CodeUri: ./storacha-bridge.zip
+      Handler: out/storacha-bridge/lambdaEntrypoint.runMigrations
+      Environment:
+        Variables:
+          ROOT_DB_NAME: !Ref RootDbName
+          SETTINGS_DEF_MODE: !Ref Environment
+      DeploymentPreference:
+        Enabled: false
       Policies:
         - SecretsManagerReadWrite
 

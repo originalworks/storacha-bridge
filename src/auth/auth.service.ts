@@ -80,16 +80,16 @@ export class AuthService {
 
   @PinoLoggerDecorator(AuthService.logger)
   async parseToken(token: string): Promise<AuthInfo> {
-    const [client, signature] = token.split('::') ?? [];
+    const [clientType, signature] = token.split('::') ?? [];
 
-    const typedClient = client as ClientType;
+    const typedClient = clientType as ClientType;
 
     if (typedClient !== 'OWEN' && typedClient !== 'VALIDATOR') {
       throw new UnauthorizedException('Invalid client type in signed message');
     }
 
     try {
-      const walletAddress = ethers.verifyMessage(client, signature);
+      const walletAddress = ethers.verifyMessage(typedClient, signature);
 
       AuthService.logger.log({
         textMsg: 'Resolved wallet',
@@ -97,7 +97,7 @@ export class AuthService {
       });
 
       return {
-        client: typedClient,
+        clientType: typedClient,
         walletAddress,
       };
     } catch (e) {

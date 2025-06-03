@@ -1,11 +1,4 @@
-import {
-  BaseContract,
-  ethers,
-  Signer,
-  TransactionReceipt,
-  TransactionResponse,
-  Wallet,
-} from 'ethers';
+import { ethers, Signer, Wallet } from 'ethers';
 import { Whitelist__factory } from '../src/contracts/whitelist/Whitelist__factory';
 import { DdexSequencer__factory } from '../src/contracts/ddexSequencer/DdexSequencer__factory';
 import { ERC1967Proxy__factory } from '../src/contracts/ERC1967Proxy/ERC1967Proxy__factory';
@@ -24,61 +17,26 @@ const GANACHE_CONFIG: GanacheConfig = {
   rpcUrl: `http://${process.env.GANACHE_PRIMARY_HOST}:${process.env.GANACHE_PORT}`,
 };
 
-async function confirmTx<T extends TransactionResponse>(
-  contractOrTx: Promise<T>,
-  signer: Signer,
-  expectedNonce?: number,
-): Promise<TransactionReceipt>;
+const createNonceController = async (signer: Signer) => {
+  let currentNonce = await signer.getNonce('pending');
 
-async function confirmTx<T extends BaseContract>(
-  contractOrTx: Promise<T>,
-  signer: Signer,
-  expectedNonce?: number,
-): Promise<T>;
+  const setNonce = () => {
+    const txSettings = {
+      nonce: currentNonce,
+    };
+    currentNonce++;
+    return txSettings;
+  };
 
-async function confirmTx(
-  contractOrTx: Promise<BaseContract | TransactionResponse>,
-  signer: Signer,
-  expectedNonce?: number,
-): Promise<BaseContract | TransactionReceipt> {
-  let noncesMatch = false;
-  let retCt = 0;
-
-  while (noncesMatch === false) {
-    if (retCt >= 10) {
-      throw new Error('Cannot lineup nonces, aborting');
-    }
-    const latest = await signer.getNonce('latest');
-    const pending = await signer.getNonce('pending');
-
-    if (latest === pending) {
-      if (!expectedNonce || expectedNonce === pending) {
-        noncesMatch = true;
-      }
-    }
-    retCt++;
-    sleep(500);
-  }
-
-  const awaited = await contractOrTx;
-
-  let res: BaseContract | TransactionReceipt;
-
-  if ('wait' in awaited) {
-    res = await awaited.wait();
-  } else {
-    res = await awaited.waitForDeployment();
-  }
-
-  return res;
-}
+  return setNonce;
+};
 
 const createWallets = async (config: GanacheConfig) => {
   const provider = new ethers.JsonRpcProvider(config.rpcUrl);
   const wallets: ethers.HDNodeWallet[] = [];
   const wallet = Wallet.fromPhrase(config.mnemonic, provider);
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const hdWallet = wallet.deriveChild(i);
     await (
       await wallet.sendTransaction({
@@ -94,25 +52,21 @@ const createWallets = async (config: GanacheConfig) => {
 };
 
 export const testFixture = async () => {
-  const [deployer, owen, validator, random] =
+  const [deployer, owen, validator1, validator2, random] =
     await createWallets(GANACHE_CONFIG);
 
-  const nonceCt = await deployer.getNonce('pending');
+  const setNonce = await createNonceController(deployer);
+  const dataProvidersWhitelist = await (
+    await new Whitelist__factory(deployer).deploy(deployer.address, setNonce())
+  ).waitForDeployment();
 
-  const dataProvidersWhitelist = await confirmTx(
-    new Whitelist__factory(deployer).deploy(deployer.address),
-    deployer,
-  );
+  const validatorsWhitelist = await (
+    await new Whitelist__factory(deployer).deploy(deployer.address, setNonce())
+  ).waitForDeployment();
 
-  const validatorsWhitelist = await confirmTx(
-    new Whitelist__factory(deployer).deploy(deployer.address),
-    deployer,
-  );
-
-  const sequencerImplementation = await confirmTx(
-    new DdexSequencer__factory(deployer).deploy(),
-    deployer,
-  );
+  const sequencerImplementation = await (
+    await new DdexSequencer__factory(deployer).deploy(setNonce())
+  ).waitForDeployment();
 
   const sequencerInitializeArgs = (
     await sequencerImplementation.initialize.populateTransaction(
@@ -122,26 +76,25 @@ export const testFixture = async () => {
     )
   ).data;
 
-  const sequencerProxy = await confirmTx(
-    new ERC1967Proxy__factory(deployer).deploy(
+  const sequencerProxy = await (
+    await new ERC1967Proxy__factory(deployer).deploy(
       await sequencerImplementation.getAddress(),
       sequencerInitializeArgs,
-    ),
-    deployer,
-    nonceCt + 3,
-  );
+      setNonce(),
+    )
+  ).waitForDeployment();
 
-  await confirmTx(
-    dataProvidersWhitelist.addToWhitelist(owen.address),
-    deployer,
-    nonceCt + 4,
-  );
+  await (
+    await dataProvidersWhitelist.addToWhitelist(owen.address, setNonce())
+  ).wait();
 
-  await confirmTx(
-    validatorsWhitelist.addToWhitelist(validator.address),
-    deployer,
-    nonceCt + 5,
-  );
+  await (
+    await validatorsWhitelist.addToWhitelist(validator1.address, setNonce())
+  ).wait();
+
+  await (
+    await validatorsWhitelist.addToWhitelist(validator2.address, setNonce())
+  ).wait();
 
   return {
     sequencer: sequencerProxy,
@@ -151,7 +104,8 @@ export const testFixture = async () => {
     wallets: {
       deployer,
       owen,
-      validator,
+      validator1,
+      validator2,
       random,
     },
   };

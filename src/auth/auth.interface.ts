@@ -2,7 +2,7 @@ import { Request } from 'express';
 
 export interface AuthInfo {
   walletAddress: string;
-  client: ClientType;
+  clientType: ClientType;
 }
 
 export interface ReqWithWallet extends Request, AuthInfo {}

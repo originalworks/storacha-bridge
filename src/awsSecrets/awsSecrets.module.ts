@@ -8,7 +8,10 @@ import {
 } from '@aws-sdk/client-secrets-manager';
 import { IConfig } from '../config/config';
 import { ISecrets } from './awsSecrets.interface';
-import { AwsSecretsManagerMock } from './awsSecrets.mock';
+import {
+  AwsSecretsManagerLocal,
+  AwsSecretsManagerMock,
+} from './awsSecrets.mock';
 
 export const Secrets = 'Secrets';
 
@@ -45,8 +48,14 @@ export const SecretsFactory = {
     {
       provide: SecretsManagerClient,
       useFactory: (configService: ConfigService<IConfig, true>) => {
-        if (configService.get('ENVIRONMENT') === 'test') {
+        const env = configService.get('ENVIRONMENT');
+
+        if (env === 'test') {
           return new AwsSecretsManagerMock();
+        }
+
+        if (env === 'local') {
+          return new AwsSecretsManagerLocal();
         }
 
         return new SecretsManagerClient();
