@@ -70,7 +70,7 @@ export class AuthService {
     } catch (e) {
       AuthService.logger.error({
         errorMsg: 'RPC Failure',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new InternalServerErrorException(
         'RPC Error. Please try again later',
@@ -80,16 +80,16 @@ export class AuthService {
 
   @PinoLoggerDecorator(AuthService.logger)
   async parseToken(token: string): Promise<AuthInfo> {
-    const [client, signature] = token.split('::') ?? [];
+    const [clientType, signature] = token.split('::') ?? [];
 
-    const typedClient = client as ClientType;
+    const typedClient = clientType as ClientType;
 
     if (typedClient !== 'OWEN' && typedClient !== 'VALIDATOR') {
       throw new UnauthorizedException('Invalid client type in signed message');
     }
 
     try {
-      const walletAddress = ethers.verifyMessage(client, signature);
+      const walletAddress = ethers.verifyMessage(typedClient, signature);
 
       AuthService.logger.log({
         textMsg: 'Resolved wallet',
@@ -97,13 +97,13 @@ export class AuthService {
       });
 
       return {
-        client: typedClient,
+        clientType: typedClient,
         walletAddress,
       };
     } catch (e) {
       AuthService.logger.error({
         errorMsg: 'Failed to verify message',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new UnauthorizedException(
         'Malformed signature in authorization header',

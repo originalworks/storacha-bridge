@@ -12,26 +12,50 @@ services:
     user: node
     working_dir: /app
     environment:
-      STORACHA_KEY: abcd
-      STORACHA_PROOF: abcd
       ENVIRONMENT: test
       GANACHE_PRIMARY_MNEMONIC: someone token phrase mouse prison great priority cactus boost solid leave profit long bar door
       GANACHE_PRIMARY_HOST: ganache
       GANACHE_PORT: 8545
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: postgres
     
   test-runner:
     extends:
       service: base
     depends_on:
       - ganache
+      - db
     command: "npm run test"
 
-  start-dev:
+  local:
     extends:
       service: base
     depends_on:
       - ganache
-    command: "npm run start:dev"
+      - db
+    ports:
+      - "3000:3000"
+    environment:
+      ENVIRONMENT: local
+      DDEX_SEQUENCER_ADDRESS: "0xF3976de8Bde0FeaAAf77A91aE41033A93D36fC21" # if deployment comes from fixture
+      TEMP_PATH: ./tmp
+      LOCAL_STORACHA_KEY: Your storacha private key goes here
+      LOCAL_OWEN_PROOF: Your proof for space for Owens
+      LOCAL_VALIDATOR_PROOF: Your proof for space for Validator1
+    command: >
+      sh -c "
+        echo '🛠 Building app...' &&
+        npm run build &&
+        echo '📂 Loading fixtures...' &&
+        npm run run-fixture &&
+        echo '📦 Running migrations...' &&
+        npm run migration:run &&
+        echo '🚀 Starting local app...' &&
+        npm run start:dev
+      "
 
   ganache:
     image: trufflesuite/ganache
@@ -39,3 +63,12 @@ services:
       --wallet.mnemonic "someone token phrase mouse prison great priority cactus boost solid leave profit long bar door" 
       --wallet.defaultBalance 1000000 
       --chain.chainId 100
+  
+  db:
+    image: postgres:17.5
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres

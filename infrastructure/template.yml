@@ -8,6 +8,14 @@ Parameters:
     Type: String
   AutoPublishAlias:
     Type: String
+  StorachaBridgeDBName:
+    Type: String
+  DbHost:
+    Type: AWS::SSM::Parameter::Value<String>
+  DbSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+  RootDbName:
+    Type: AWS::SSM::Parameter::Value<String>
 
 Globals:
   Function:
@@ -21,8 +29,54 @@ Globals:
         SECRETS_PATH: !Sub ${Environment}/StorachaBridge
         DDEX_SEQUENCER_ADDRESS: !Ref DdexSequencerAddress
         NO_COLOR: true
+        DB_HOST: !Ref DbHost
+        DB_PORT: "5432"
+        DB_USER: !Join
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - !Ref DbSecret
+            - ":SecretString:username}}"
+        DB_PASSWORD: !Join
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - !Ref DbSecret
+            - ":SecretString:password}}"
+        DB_SYNCRONIZE: "false"
+        DB_DATABASE: !Ref StorachaBridgeDBName
 
 Resources:
+  StorachaBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+                - !Sub states.${AWS::Region}.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: StatesExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource:
+                  - "*"
+              - Action:
+                  - codedeploy:*
+                Effect: Allow
+                Resource:
+                  - "*"
+
   Api:
     Type: AWS::Serverless::Api
     Properties:
@@ -44,6 +98,10 @@ Resources:
       MemorySize: 512
       AutoPublishAlias: !Ref AutoPublishAlias
       # ReservedConcurrentExecutions: 1
+      DeploymentPreference:
+        Type: AllAtOnce
+        Hooks:
+          PreTraffic: !Ref RunMigrations
       Events:
         NestJs:
           Type: Api
@@ -51,8 +109,21 @@ Resources:
             RestApiId: !Ref Api
             Path: /{whatever+}
             Method: ANY
-      Policies:
-        - SecretsManagerReadWrite
+      Role: !GetAtt StorachaBridgeRole.Arn
+
+  RunMigrations:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "CodeDeployHook_StorachaBridge-${Environment}-RunMigrations"
+      CodeUri: ./storacha-bridge.zip
+      Handler: out/storacha-bridge/lambdaEntrypoint.runMigrations
+      Environment:
+        Variables:
+          ROOT_DB_NAME: !Ref RootDbName
+          SETTINGS_DEF_MODE: !Ref Environment
+      DeploymentPreference:
+        Enabled: false
+      Role: !GetAtt StorachaBridgeRole.Arn
 
 Outputs:
   ApiUrl:

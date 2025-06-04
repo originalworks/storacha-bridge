@@ -14,9 +14,13 @@ deploy-infra-dev:
 
 cleanup:
 	rm -rf out && \
+	rm -rf ../dist && \
 	rm -rf $(ARTIFACT_NAME)
 
 storacha-bridge.zip: cleanup
+	npm run build && \
 	npm run esbuild && \
-	find out/storacha-bridge -type f \( -name "*.js" -o -name "*.js.map" -o -name "*sentry_cpu_profiler-linux-x64-glibc*" \) \
-	| zip $@ -@
+	find out/storacha-bridge -type f -name 'sentry_cpu*' ! -name '*sentry_cpu_profiler-linux-x64-glibc*' -exec rm -f {} + && \
+	mkdir -p out/node_modules && cp -r ../node_modules/app-root-path out/node_modules &&  \
+	mkdir -p out/dist && cp -r ../dist/migrations out/dist && \
+	zip -r storacha-bridge.zip out

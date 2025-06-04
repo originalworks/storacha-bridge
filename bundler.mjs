@@ -36,5 +36,6 @@ await esbuild.build({
     '@nestjs/microservices',
     '@nestjs/websockets',
     'class-transformer/storage',
+    'app-root-path',
   ],
 });

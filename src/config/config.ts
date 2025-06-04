@@ -3,6 +3,10 @@ export interface IConfig {
   TEMP_PATH: string;
   DDEX_SEQUENCER_ADDRESS: string;
   SECRETS_PATH: string;
+  // LOCAL ONLY
+  // LOCAL_STORACHA_KEY
+  // LOCAL_OWEN_PROOF
+  // LOCAL_VALIDATOR_PROOF
 }
 
 export const config = (): IConfig => ({

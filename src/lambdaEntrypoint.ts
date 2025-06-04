@@ -3,6 +3,8 @@ import { APIGatewayProxyEvent, Callback, Context } from 'aws-lambda';
 import { AppInstance } from './app.instance';
 import { initSentry } from './sentry';
 
+export { runMigrations } from './runMigrations';
+
 let appServer: ReturnType<typeof awsServerlessExpress>;
 
 export const app = async (
