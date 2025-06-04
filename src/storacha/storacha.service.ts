@@ -47,10 +47,14 @@ export class StorachaService {
       const principal = Signer.parse(this.secrets.STORACHA_KEY);
       const store = new StoreMemory();
       this._client = await create({ principal, store });
+      StorachaService.logger.log({
+        textMsg: 'Storacha client has been set',
+        did: this._client.did(),
+      });
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to initialize Storacha',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new InternalServerErrorException(
         'Storacha init error. Please try again later',
@@ -152,7 +156,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to upload files to Storacha',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new InternalServerErrorException(
         'Failed to upload files to Storacha',
@@ -196,7 +200,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to upload files to Storacha',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new InternalServerErrorException(
         'Failed to upload file to Storacha',

@@ -41,7 +41,7 @@ export class UploadService {
 
       UploadService.logger.error({
         errorMsg,
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new BadRequestException(errorMsg);
     }

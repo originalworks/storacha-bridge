@@ -70,7 +70,7 @@ export class AuthService {
     } catch (e) {
       AuthService.logger.error({
         errorMsg: 'RPC Failure',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new InternalServerErrorException(
         'RPC Error. Please try again later',
@@ -103,7 +103,7 @@ export class AuthService {
     } catch (e) {
       AuthService.logger.error({
         errorMsg: 'Failed to verify message',
-        originError: JSON.stringify(e),
+        originError: e,
       });
       throw new UnauthorizedException(
         'Malformed signature in authorization header',
