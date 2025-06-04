@@ -45,6 +45,38 @@ Globals:
         DB_DATABASE: !Ref StorachaBridgeDBName
 
 Resources:
+  StorachaBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+                - !Sub states.${AWS::Region}.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: StatesExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource:
+                  - "*"
+              - Action:
+                  - codedeploy:*
+                Effect: Allow
+                Resource:
+                  - "*"
+
   Api:
     Type: AWS::Serverless::Api
     Properties:
@@ -77,8 +109,7 @@ Resources:
             RestApiId: !Ref Api
             Path: /{whatever+}
             Method: ANY
-      Policies:
-        - SecretsManagerReadWrite
+      Role: !GetAtt StorachaBridgeRole.Arn
 
   RunMigrations:
     Type: AWS::Serverless::Function
@@ -92,8 +123,7 @@ Resources:
           SETTINGS_DEF_MODE: !Ref Environment
       DeploymentPreference:
         Enabled: false
-      Policies:
-        - SecretsManagerReadWrite
+      Role: !GetAtt StorachaBridgeRole.Arn
 
 Outputs:
   ApiUrl:

@@ -3,6 +3,9 @@
     "Environment": "devel",
     "DdexSequencerAddress": "0x75AbeCf07C26368F0f4AA0b0d3637A732E25467e",
     "AutoPublishAlias": "DevStorachaBridge",
-    "StorachaBridgeDBName": "storacha-bridge"
+    "StorachaBridgeDBName": "storacha-bridge",
+    "DbHost": "/ow/devel/db/host",
+    "DbSecret": "/ow/devel/db/secret-arn",
+    "RootDbName": "/ow/devel/db/name"
   }
 }

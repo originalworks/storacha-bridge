@@ -17,6 +17,7 @@ export const createDBIfNotExists = async (dataBaseName: string) => {
   const query = await dataSource.query(
     `SELECT datname FROM pg_database WHERE datname = '${dataBaseName}'`,
   );
+
   if (!query[0]?.datname) {
     await dataSource.query(`CREATE DATABASE "${dataBaseName}"`);
     console.log(`${dataBaseName} was created`);

@@ -49,10 +49,10 @@ services:
       sh -c "
         echo '🛠 Building app...' &&
         npm run build &&
-        echo '📦 Running migrations...' &&
-        npm run migration:run &&
         echo '📂 Loading fixtures...' &&
         npm run run-fixture &&
+        echo '📦 Running migrations...' &&
+        npm run migration:run &&
         echo '🚀 Starting local app...' &&
         npm run start:dev
       "

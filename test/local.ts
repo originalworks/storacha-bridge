@@ -18,7 +18,6 @@ const runLocal = async () => {
   const blob = new Blob([buffer], { type: 'image/jpeg' });
 
   formData.append('file', blob, 'file.jpeg');
-
   const res = await fetch('http://localhost:3000/w3up/file', {
     method: 'POST',
     headers: {

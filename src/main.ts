@@ -1,7 +1,7 @@
 import { AppInstance } from './app.instance';
 
 async function bootstrap() {
-  const app = await AppInstance.getInstance();
+  const app = await AppInstance.getLocalInstance();
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0', () => {
     console.log('Server started on http://0.0.0.0:3000');
   });
