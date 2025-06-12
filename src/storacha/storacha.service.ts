@@ -18,6 +18,7 @@ import { Repository } from 'typeorm';
 import { DID } from '@web3-storage/w3up-client/types';
 import type { AuthInfo } from '../auth/auth.interface';
 import { ethers } from 'ethers';
+import { serializeError } from '../utils/serializeError';
 
 @Injectable()
 export class StorachaService {
@@ -54,7 +55,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to initialize Storacha',
-        originError: e,
+        originError: serializeError(e),
       });
       throw new InternalServerErrorException(
         'Storacha init error. Please try again later',
@@ -156,7 +157,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to upload files to Storacha',
-        originError: e,
+        originError: serializeError(e),
       });
       throw new InternalServerErrorException(
         'Failed to upload files to Storacha',
@@ -200,7 +201,7 @@ export class StorachaService {
     } catch (e) {
       StorachaService.logger.error({
         errorMsg: 'Failed to upload files to Storacha',
-        originError: e,
+        originError: serializeError(e),
       });
       throw new InternalServerErrorException(
         'Failed to upload file to Storacha',
