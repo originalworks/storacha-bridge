@@ -18,9 +18,8 @@ export const getFactory = (dataSource: DataSource) => {
     factory.setAdapter(new CustomTypeORMAdapter(dataSource));
     factory.define('Space', Space, {
       id: factory.sequence((n) => n),
-      walletAddress: () => ethers.Wallet.createRandom().address,
+      walletAddress: () => ethers.Wallet.createRandom().address.toLowerCase(),
       did: randomDID,
-      role: 'validator',
       proofBase64: factory.chance('word', { length: 160 }),
       description: null,
       createdAt: '2021-09-01T12:46:25.241Z',

@@ -17,7 +17,6 @@ import { Space } from './storacha.entity';
 import { Repository } from 'typeorm';
 import { DID } from '@web3-storage/w3up-client/types';
 import type { AuthInfo } from '../auth/auth.interface';
-import { ethers } from 'ethers';
 import { serializeError } from '../utils/serializeError';
 
 @Injectable()
@@ -69,18 +68,16 @@ export class StorachaService {
 
   @PinoLoggerDecorator(StorachaService.logger)
   private async setUserSpace(authInfo: AuthInfo): Promise<void> {
-    const { clientType, walletAddress } = authInfo;
+    const { clientType, walletAddress, spaceOwnerAddress } = authInfo;
 
-    let space: Space;
+    const lookupAddress = spaceOwnerAddress ?? walletAddress;
 
-    if (clientType === 'OWEN') {
-      space = await this.spacesRepo.findOneBy({ clientType });
-    } else {
-      space = await this.spacesRepo.findOneBy({ walletAddress });
-    }
+    const space = await this.spacesRepo.findOneBy({
+      walletAddress: lookupAddress,
+    });
 
     if (!space) {
-      const errorMsg = `Storacha space not found for address ${walletAddress}. If you should have one please contact admin@original.works`;
+      const errorMsg = `Storacha space not found for address ${lookupAddress}. If you should have one please contact admin@original.works`;
 
       StorachaService.logger.error({
         errorMsg,
@@ -97,6 +94,7 @@ export class StorachaService {
         status: {
           walletAddress,
           clientType,
+          spaceOwnerAddress,
           spaceDID: space.did,
           parsedDID: space.did,
           alreadyAdded: true,
@@ -112,8 +110,7 @@ export class StorachaService {
 
       await this.spacesRepo.update(
         {
-          walletAddress:
-            clientType === 'OWEN' ? ethers.ZeroAddress : walletAddress,
+          walletAddress: lookupAddress,
         },
         { did: parsedSpace.did() },
       );
@@ -123,6 +120,7 @@ export class StorachaService {
         status: {
           walletAddress,
           clientType,
+          spaceOwnerAddress,
           spaceDID: space.did,
           parsedDID: parsedSpace.did(),
           alreadyAdded: false,

@@ -2,6 +2,7 @@ import {
   Controller,
   FileTypeValidator,
   MaxFileSizeValidator,
+  Param,
   ParseFilePipe,
   Post,
   Req,
@@ -10,9 +11,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { AuthGuard, OnlyValidatorGuard } from '../auth/auth.guard';
+import {
+  AuthGuard,
+  OnlyOwenGuard,
+  OnlyValidatorGuard,
+} from '../auth/auth.guard';
 import { UploadService } from './upload.service';
 import type { AuthInfo, ReqWithWallet } from '../auth/auth.interface';
+import { UploadZipParamsDto } from './upload.dto';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5mb
 
@@ -20,11 +26,12 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5mb
 export class UploadController {
   constructor(private uploadService: UploadService) {}
 
-  @Post('dir')
+  @Post('dir/:spaceOwnerAddress')
   @UseGuards(AuthGuard, OnlyValidatorGuard)
   @UseInterceptors(FileInterceptor('file'))
   async handleUploadZip(
     @Req() req: ReqWithWallet,
+    @Param() params: UploadZipParamsDto,
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -42,14 +49,15 @@ export class UploadController {
   ) {
     const authInfo: AuthInfo = {
       clientType: req.clientType,
-      walletAddress: req.walletAddress,
+      walletAddress: req.walletAddress.toLowerCase(),
+      spaceOwnerAddress: params.spaceOwnerAddress.toLowerCase(),
     };
 
     return await this.uploadService.uploadZip(file.path, authInfo);
   }
 
   @Post('file')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, OnlyOwenGuard)
   @UseInterceptors(FileInterceptor('file'))
   async handleUploadFile(
     @Req() req: ReqWithWallet,
@@ -70,7 +78,7 @@ export class UploadController {
   ) {
     const authInfo: AuthInfo = {
       clientType: req.clientType,
-      walletAddress: req.walletAddress,
+      walletAddress: req.walletAddress.toLowerCase(),
     };
 
     return await this.uploadService.uploadFile(file.path, authInfo);

@@ -1,10 +1,10 @@
 jest.setTimeout(100000);
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { join } from 'path';
-import { ethers, HDNodeWallet } from 'ethers';
+import { HDNodeWallet } from 'ethers';
 import { ConfigModule } from '@nestjs/config';
 import { rm } from 'fs/promises';
 import { ClientType } from '../src/auth/auth.interface';
@@ -28,7 +28,7 @@ describe('AppController', () => {
   let fixture: Awaited<ReturnType<typeof testFixture>>;
   let spacesRepo: Repository<Space>;
 
-  const auth: { owen?: string; validator1?: string; validator2?: string } = {};
+  const auth: { owen1?: string; owen2?: string; validator?: string } = {};
 
   const storachaMock = {
     uploadDirectory: jest.fn().mockResolvedValue({ toString: randomCID }),
@@ -51,9 +51,9 @@ describe('AppController', () => {
   beforeAll(async () => {
     fixture = await testFixture();
 
-    auth.owen = await getAuth('OWEN', fixture.wallets.owen);
-    auth.validator1 = await getAuth('VALIDATOR', fixture.wallets.validator1);
-    auth.validator2 = await getAuth('VALIDATOR', fixture.wallets.validator2);
+    auth.owen1 = await getAuth('OWEN', fixture.wallets.owen1);
+    auth.owen2 = await getAuth('OWEN', fixture.wallets.owen2);
+    auth.validator = await getAuth('VALIDATOR', fixture.wallets.validator);
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [
@@ -88,16 +88,21 @@ describe('AppController', () => {
     spacesRepo = dataSource.getRepository(Space);
     app = module.createNestApplication();
 
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
+
     await app.init();
 
     await factory.createMany<Space>(Space.name, [
       {
-        clientType: 'OWEN',
-        walletAddress: ethers.ZeroAddress,
+        walletAddress: fixture.wallets.owen1.address.toLowerCase(),
       },
       {
-        clientType: 'VALIDATOR',
-        walletAddress: fixture.wallets.validator1.address,
+        walletAddress: fixture.wallets.owen2.address.toLowerCase(),
       },
     ]);
   });
@@ -113,7 +118,7 @@ describe('AppController', () => {
     describe('Auth', () => {
       it('Fails without authorization header', async () => {
         const res = await request(app.getHttpServer())
-          .post('/w3up/dir')
+          .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
           .expect(401);
         expect(res.text).toEqual(
           `{"message":"Missing authorization header","error":"Unauthorized","statusCode":401}`,
@@ -122,7 +127,7 @@ describe('AppController', () => {
 
       it('Fails on malformed authorization header', async () => {
         let res = await request(app.getHttpServer())
-          .post('/w3up/dir')
+          .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
           .set('authorization', 'HYDRAULIK::TOMASZ')
           .expect(401);
 
@@ -131,7 +136,7 @@ describe('AppController', () => {
         );
 
         res = await request(app.getHttpServer())
-          .post('/w3up/dir')
+          .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
           .set('authorization', 'OWEN::TOMASZ')
           .expect(401);
 
@@ -142,27 +147,27 @@ describe('AppController', () => {
 
       it('Fails on whitelist', async () => {
         let res = await request(app.getHttpServer())
-          .post('/w3up/dir')
+          .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
           .set(
             'authorization',
-            await getAuth('OWEN', fixture.wallets.validator1),
+            await getAuth('OWEN', fixture.wallets.validator),
           )
           .expect(401);
 
         expect(res.text).toEqual(
-          `{"message":"Address ${fixture.wallets.validator1.address} is not whitelisted on OWEN whitelist","error":"Unauthorized","statusCode":401}`,
+          `{"message":"Address ${fixture.wallets.validator.address} is not whitelisted on OWEN whitelist","error":"Unauthorized","statusCode":401}`,
         );
 
         res = await request(app.getHttpServer())
-          .post('/w3up/dir')
+          .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
           .set(
             'authorization',
-            await getAuth('VALIDATOR', fixture.wallets.owen),
+            await getAuth('VALIDATOR', fixture.wallets.owen1),
           )
           .expect(401);
 
         expect(res.text).toEqual(
-          `{"message":"Address ${fixture.wallets.owen.address} is not whitelisted on VALIDATOR whitelist","error":"Unauthorized","statusCode":401}`,
+          `{"message":"Address ${fixture.wallets.owen1.address} is not whitelisted on VALIDATOR whitelist","error":"Unauthorized","statusCode":401}`,
         );
       });
     });
@@ -171,8 +176,8 @@ describe('AppController', () => {
       describe('/POST w3up/dir', () => {
         it('Rejects when no file attached', async () => {
           const res = await request(app.getHttpServer())
-            .post('/w3up/dir')
-            .set('authorization', auth.validator1)
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.validator)
             .expect(400);
 
           expect(res.text).toEqual(
@@ -180,12 +185,31 @@ describe('AppController', () => {
           );
         });
 
+        it('Rejects when no spaceOwnerAddress added or not 0x address', async () => {
+          const file = join(__dirname, './test.zip');
+
+          let res = await request(app.getHttpServer())
+            .post(`/w3up/dir`)
+            .set('authorization', auth.validator)
+            .expect(404);
+
+          res = await request(app.getHttpServer())
+            .post(`/w3up/dir/zenek-martyniuk`)
+            .set('authorization', auth.validator)
+            .attach('file', file)
+            .expect(400);
+
+          expect(res.text).toEqual(
+            `{"message":["spaceOwnerAddress must be an Ethereum address"],"error":"Bad Request","statusCode":400}`,
+          );
+        });
+
         it('Rejects non zip files', async () => {
           const file = join(__dirname, './test.jpeg');
 
           const res = await request(app.getHttpServer())
-            .post('/w3up/dir')
-            .set('authorization', auth.validator1)
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.validator)
             .attach('file', file)
             .expect(400);
 
@@ -198,8 +222,8 @@ describe('AppController', () => {
           const file = join(__dirname, './test.zip');
 
           const res = await request(app.getHttpServer())
-            .post('/w3up/dir')
-            .set('authorization', auth.owen)
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.owen1)
             .attach('file', file)
             .expect(401);
 
@@ -212,8 +236,8 @@ describe('AppController', () => {
           const file = join(__dirname, './test.zip');
 
           const res = await request(app.getHttpServer())
-            .post('/w3up/dir')
-            .set('authorization', auth.validator1)
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.validator)
             .attach('file', file)
             .expect(201);
 
@@ -229,7 +253,7 @@ describe('AppController', () => {
         it('Rejects when no file attached', async () => {
           const res = await request(app.getHttpServer())
             .post('/w3up/file')
-            .set('authorization', auth.owen)
+            .set('authorization', auth.owen1)
             .expect(400);
 
           expect(res.text).toEqual(
@@ -242,7 +266,7 @@ describe('AppController', () => {
 
           const res = await request(app.getHttpServer())
             .post('/w3up/file')
-            .set('authorization', auth.owen)
+            .set('authorization', auth.owen1)
             .attach('file', file)
             .expect(400);
 
@@ -251,12 +275,26 @@ describe('AppController', () => {
           );
         });
 
+        it('Rejects when called by non-owen', async () => {
+          const file = join(__dirname, './test.jpeg');
+
+          const res = await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.validator)
+            .attach('file', file)
+            .expect(401);
+
+          expect(res.text).toEqual(
+            `{"message":"Only Data Providers can use this endpoint","error":"Unauthorized","statusCode":401}`,
+          );
+        });
+
         it('Processes file', async () => {
           const file = join(__dirname, './test.jpeg');
 
           const res = await request(app.getHttpServer())
             .post('/w3up/file')
-            .set('authorization', auth.owen)
+            .set('authorization', auth.owen1)
             .attach('file', file)
             .expect(201);
 
@@ -271,6 +309,7 @@ describe('AppController', () => {
 
     describe('Spaces management', () => {
       const file = join(__dirname, './test.jpeg');
+      const fileZip = join(__dirname, './test.zip');
 
       beforeEach(async () => {
         await clearDatabase(dataSource);
@@ -279,106 +318,104 @@ describe('AppController', () => {
       it('Throws when space has not been found', async () => {
         let res = await request(app.getHttpServer())
           .post('/w3up/file')
-          .set('authorization', auth.owen)
+          .set('authorization', auth.owen1)
           .attach('file', file)
           .expect(404);
 
         expect(res.text).toEqual(
-          `{"message":"Storacha space not found for address ${fixture.wallets.owen.address}. If you should have one please contact admin@original.works","error":"Not Found","statusCode":404}`,
+          `{"message":"Storacha space not found for address ${fixture.wallets.owen1.address.toLowerCase()}. If you should have one please contact admin@original.works","error":"Not Found","statusCode":404}`,
         );
 
         res = await request(app.getHttpServer())
-          .post('/w3up/file')
-          .set('authorization', auth.validator1)
-          .attach('file', file)
+          .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+          .set('authorization', auth.validator)
+          .attach('file', fileZip)
           .expect(404);
 
         expect(res.text).toEqual(
-          `{"message":"Storacha space not found for address ${fixture.wallets.validator1.address}. If you should have one please contact admin@original.works","error":"Not Found","statusCode":404}`,
+          `{"message":"Storacha space not found for address ${fixture.wallets.owen1.address.toLowerCase()}. If you should have one please contact admin@original.works","error":"Not Found","statusCode":404}`,
         );
       });
 
       it('Sets did if proof is present but did is empty', async () => {
-        const [owenSpace, validator1Space] = await factory.createMany<Space>(
+        const [owen1Space, owen2Space] = await factory.createMany<Space>(
           Space.name,
           [
             {
-              clientType: 'OWEN',
               did: null,
-              walletAddress: ethers.ZeroAddress,
+              walletAddress: fixture.wallets.owen1.address.toLowerCase(),
             },
             {
-              clientType: 'VALIDATOR',
               did: null,
-              walletAddress: fixture.wallets.validator1.address,
+              walletAddress: fixture.wallets.owen2.address.toLowerCase(),
             },
           ],
         );
 
-        expect(owenSpace.did).toBeNull();
+        expect(owen1Space.did).toBeNull();
 
         storachaMock.setCurrentSpace.mockRejectedValueOnce(new Error());
 
         await request(app.getHttpServer())
           .post('/w3up/file')
-          .set('authorization', auth.owen)
+          .set('authorization', auth.owen1)
           .attach('file', file)
           .expect(201);
 
         const owenSpaceAfter = await spacesRepo.findOneBy({
-          clientType: 'OWEN',
+          walletAddress: fixture.wallets.owen1.address.toLowerCase(),
         });
 
         expect(owenSpaceAfter.did).toMatch(/did:key:.*/g);
 
-        expect(validator1Space.did).toBeNull();
+        expect(owen2Space.did).toBeNull();
 
         storachaMock.setCurrentSpace.mockRejectedValueOnce(new Error());
 
         await request(app.getHttpServer())
-          .post('/w3up/file')
-          .set('authorization', auth.validator1)
-          .attach('file', file)
+          .post(`/w3up/dir/${fixture.wallets.owen2.address}`)
+          .set('authorization', auth.validator)
+          .attach('file', fileZip)
           .expect(201);
 
-        const validator1SpaceAfter = await spacesRepo.findOneBy({
-          walletAddress: fixture.wallets.validator1.address,
+        const owen2SpaceAfter = await spacesRepo.findOneBy({
+          walletAddress: fixture.wallets.owen2.address.toLowerCase(),
         });
 
-        expect(validator1SpaceAfter.did).toMatch(/did:key:.*/g);
+        expect(owen2SpaceAfter.did).toMatch(/did:key:.*/g);
       });
 
       it('Selects correct space', async () => {
-        const [validator1Space, validator2Space] =
-          await factory.createMany<Space>(Space.name, [
+        const [owen1Space, owen2Space] = await factory.createMany<Space>(
+          Space.name,
+          [
             {
-              clientType: 'VALIDATOR',
-              walletAddress: fixture.wallets.validator1.address,
+              walletAddress: fixture.wallets.owen1.address.toLowerCase(),
             },
             {
-              clientType: 'VALIDATOR',
-              walletAddress: fixture.wallets.validator2.address,
+              walletAddress: fixture.wallets.owen2.address.toLowerCase(),
             },
-          ]);
-
-        await request(app.getHttpServer())
-          .post('/w3up/file')
-          .set('authorization', auth.validator1)
-          .attach('file', file)
-          .expect(201);
-
-        expect(storachaMock.setCurrentSpace).toHaveBeenCalledWith(
-          validator1Space.did,
+          ],
         );
 
         await request(app.getHttpServer())
           .post('/w3up/file')
-          .set('authorization', auth.validator2)
+          .set('authorization', auth.owen1)
           .attach('file', file)
           .expect(201);
 
         expect(storachaMock.setCurrentSpace).toHaveBeenCalledWith(
-          validator2Space.did,
+          owen1Space.did,
+        );
+
+        await request(app.getHttpServer())
+          .post(`/w3up/dir/${fixture.wallets.owen2.address}`)
+          .set('authorization', auth.validator)
+          .attach('file', fileZip)
+          .expect(201);
+
+        expect(storachaMock.setCurrentSpace).toHaveBeenCalledWith(
+          owen2Space.did,
         );
       });
     });

@@ -49,7 +49,7 @@ jobs:
         working-directory: infrastructure
 
       - name: "Deploy infrastructure to AWS"
-        run: make deploy-infra-dev
+        run: make deploy-stage
         working-directory: infrastructure
     
     #   - name: Create Sentry release
