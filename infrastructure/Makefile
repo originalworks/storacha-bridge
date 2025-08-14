@@ -14,6 +14,12 @@ deploy-stage: PARAMETERS_FILE=template-config.stage.json
 deploy-stage: PARAMETERS=$(shell jq -r '.Parameters | to_entries | map("\(.key)=\(.value)") | join(" ")' $(PARAMETERS_FILE))
 deploy-stage: .deploy
 
+deploy-prod: ENVIRONMENT=prod
+deploy-prod: STACK_NAME=prod-storacha-bridge
+deploy-prod: PARAMETERS_FILE=template-config.prod.json
+deploy-prod: PARAMETERS=$(shell jq -r '.Parameters | to_entries | map("\(.key)=\(.value)") | join(" ")' $(PARAMETERS_FILE))
+deploy-prod: .deploy
+
 cleanup:
 	rm -rf out && \
 	rm -rf ../dist && \
