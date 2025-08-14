@@ -12,7 +12,7 @@ export const getDbConfig = (): DataSourceOptions => ({
   migrations: ['out/dist/migrations/*.js'],
   synchronize: false,
   ssl: {
-    rejectUnauthorized: process.env.ENVIRONMENT === 'prod' ? true : false,
+    rejectUnauthorized: false,
   },
 });
 
@@ -26,7 +26,7 @@ export const dbCreatorConfig = (): DataSourceOptions => ({
   database: process.env.ROOT_DB_NAME,
   synchronize: false,
   ssl: {
-    rejectUnauthorized: process.env.ENVIRONMENT === 'prod' ? true : false,
+    rejectUnauthorized: false,
   },
 });
 
