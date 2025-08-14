@@ -52,7 +52,7 @@ const createWallets = async (config: GanacheConfig) => {
 };
 
 export const testFixture = async () => {
-  const [deployer, owen, validator1, validator2, random] =
+  const [deployer, owen1, owen2, validator, random] =
     await createWallets(GANACHE_CONFIG);
 
   const setNonce = await createNonceController(deployer);
@@ -85,15 +85,15 @@ export const testFixture = async () => {
   ).waitForDeployment();
 
   await (
-    await dataProvidersWhitelist.addToWhitelist(owen.address, setNonce())
+    await dataProvidersWhitelist.addToWhitelist(owen1.address, setNonce())
   ).wait();
 
   await (
-    await validatorsWhitelist.addToWhitelist(validator1.address, setNonce())
+    await dataProvidersWhitelist.addToWhitelist(owen2.address, setNonce())
   ).wait();
 
   await (
-    await validatorsWhitelist.addToWhitelist(validator2.address, setNonce())
+    await validatorsWhitelist.addToWhitelist(validator.address, setNonce())
   ).wait();
 
   return {
@@ -103,9 +103,9 @@ export const testFixture = async () => {
     rpcUrl: GANACHE_CONFIG.rpcUrl,
     wallets: {
       deployer,
-      owen,
-      validator1,
-      validator2,
+      owen1,
+      owen2,
+      validator,
       random,
     },
   };

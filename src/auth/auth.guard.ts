@@ -50,3 +50,18 @@ export class OnlyValidatorGuard implements CanActivate {
     return true;
   }
 }
+
+@Injectable()
+export class OnlyOwenGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest() as ReqWithWallet;
+
+    if (request.clientType !== 'OWEN') {
+      throw new UnauthorizedException(
+        'Only Data Providers can use this endpoint',
+      );
+    }
+
+    return true;
+  }
+}

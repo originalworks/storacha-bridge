@@ -1,12 +1,10 @@
 import {
-  Check,
   Column,
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import type { ClientType } from '../auth/auth.interface';
 
 @Entity({ name: 'Spaces' })
 export class Space {
@@ -28,13 +26,6 @@ export class Space {
     nullable: false,
   })
   proofBase64: string;
-
-  @Column({
-    type: 'text',
-    nullable: false,
-  })
-  @Check(`"clientType" IN ('OWEN', 'VALIDATOR')`)
-  clientType: ClientType;
 
   @Column({ nullable: true })
   description?: string;
