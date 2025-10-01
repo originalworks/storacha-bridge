@@ -41,7 +41,10 @@ export class UploadController {
               return `File is too big, max ${maxSize} is accepted`;
             },
           }),
-          new FileTypeValidator({ fileType: 'application/zip' }),
+          new FileTypeValidator({
+            fileType: 'application/zip',
+            skipMagicNumbersValidation: true,
+          }),
         ],
       }),
     )
@@ -70,7 +73,10 @@ export class UploadController {
               return `File is too big, max ${maxSize} is accepted`;
             },
           }),
-          new FileTypeValidator({ fileType: 'image/*' }),
+          new FileTypeValidator({
+            fileType: 'image/*',
+            skipMagicNumbersValidation: true,
+          }),
         ],
       }),
     )
