@@ -7,7 +7,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { filesFromPaths } from './filesFromPath';
-import type { Client } from '@web3-storage/w3up-client' with { 'resolution-mode': 'import' };
+import type { Client } from '@storacha/client' with { 'resolution-mode': 'import' };
+import { DID } from '@storacha/client/types';
 import { UploadResponse } from './storacha.types';
 import { PinoLoggerDecorator } from '../pinoLogger/logger';
 import { Secrets } from '../awsSecrets/awsSecrets.module';
@@ -15,7 +16,6 @@ import { type ISecrets } from '../awsSecrets/awsSecrets.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Space } from './storacha.entity';
 import { Repository } from 'typeorm';
-import { DID } from '@web3-storage/w3up-client/types';
 import type { AuthInfo } from '../auth/auth.interface';
 import { serializeError } from '../utils/serializeError';
 
@@ -37,13 +37,9 @@ export class StorachaService {
       return;
     }
     try {
-      const { StoreMemory } = await import(
-        '@web3-storage/w3up-client/stores/memory'
-      );
-      const { create } = await import('@web3-storage/w3up-client');
-      const { Signer } = await import(
-        '@web3-storage/w3up-client/principal/ed25519'
-      );
+      const { StoreMemory } = await import('@storacha/client/stores/memory');
+      const { create } = await import('@storacha/client');
+      const { Signer } = await import('@storacha/client/principal/ed25519');
       const principal = Signer.parse(this.secrets.STORACHA_KEY);
       const store = new StoreMemory();
       this._client = await create({ principal, store });
@@ -63,7 +59,7 @@ export class StorachaService {
   }
 
   private async loadProofParser() {
-    return await import('@web3-storage/w3up-client/proof');
+    return await import('@storacha/client/proof');
   }
 
   @PinoLoggerDecorator(StorachaService.logger)
