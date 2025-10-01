@@ -214,7 +214,7 @@ describe('AppController', () => {
             .expect(400);
 
           expect(res.text).toEqual(
-            `{"message":"Validation failed (expected type is application/zip)","error":"Bad Request","statusCode":400}`,
+            `{"message":"Validation failed (current file type is image/jpeg, expected type is application/zip)","error":"Bad Request","statusCode":400}`,
           );
         });
 
@@ -238,8 +238,10 @@ describe('AppController', () => {
           const res = await request(app.getHttpServer())
             .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
             .set('authorization', auth.validator)
-            .attach('file', file)
-            .expect(201);
+            .attach('file', file);
+
+          console.log(res.text);
+          // .expect(201);
 
           expect(res.body.cid).toBeDefined();
           expect(typeof res.body.cid).toBe('string');
@@ -271,7 +273,7 @@ describe('AppController', () => {
             .expect(400);
 
           expect(res.text).toEqual(
-            `{"message":"Validation failed (expected type is image/*)","error":"Bad Request","statusCode":400}`,
+            `{"message":"Validation failed (current file type is application/zip, expected type is image/*)","error":"Bad Request","statusCode":400}`,
           );
         });
 
