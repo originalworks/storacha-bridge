@@ -3,6 +3,7 @@ export interface IConfig {
   TEMP_PATH: string;
   DDEX_SEQUENCER_ADDRESS: string;
   SECRETS_PATH: string;
+  IPFS_BUCKET_NAME: string;
   // LOCAL ONLY
   // LOCAL_STORACHA_KEY
   // LOCAL_OWEN_PROOF
@@ -14,4 +15,5 @@ export const config = (): IConfig => ({
   TEMP_PATH: process.env.TEMP_PATH,
   DDEX_SEQUENCER_ADDRESS: process.env.DDEX_SEQUENCER_ADDRESS,
   SECRETS_PATH: process.env.SECRETS_PATH,
+  IPFS_BUCKET_NAME: process.env.IPFS_BUCKET_NAME,
 });

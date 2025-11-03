@@ -28,6 +28,7 @@ services:
     depends_on:
       - ganache
       - db
+      - localstack
     command: "npm run test"
 
   local:
@@ -72,3 +73,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      - SERVICES=s3
+    ports:
+      - "4566:4566"

@@ -6,6 +6,8 @@
     "StorachaBridgeDBName": "stage-storacha-bridge",
     "RootDbName": "/ow/stage/db/name",
     "DbSecret": "/ow/stage/db/secret-arn",
-    "DbHost": "/ow/stage/db/host"
+    "DbHost": "/ow/stage/db/host",
+    "IPFSStorageArn": "",
+    "IPFSStorageName": ""
   }
 }

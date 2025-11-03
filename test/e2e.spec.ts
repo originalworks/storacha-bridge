@@ -8,7 +8,7 @@ import { HDNodeWallet } from 'ethers';
 import { ConfigModule } from '@nestjs/config';
 import { rm } from 'fs/promises';
 import { ClientType } from '../src/auth/auth.interface';
-import { testFixture } from './fixture';
+import { sleep, testFixture } from './fixture';
 import { IConfig } from '../src/config/config';
 import { StorachaService } from '../src/storacha/storacha.service';
 import { Secrets } from '../src/awsSecrets/awsSecrets.module';
@@ -20,6 +20,8 @@ import { DataSource, Repository } from 'typeorm';
 import { Factory, getFactory, randomCID, randomDID } from './factory';
 import { Space } from '../src/storacha/storacha.entity';
 import { clearDatabase } from './typeorm.utils';
+import { S3Client } from '@aws-sdk/client-s3';
+import { recreateBucket, existsInBucket } from './s3Utils';
 
 describe('AppController', () => {
   let factory: Factory;
@@ -27,6 +29,19 @@ describe('AppController', () => {
   let dataSource: DataSource;
   let fixture: Awaited<ReturnType<typeof testFixture>>;
   let spacesRepo: Repository<Space>;
+  let s3Client: S3Client;
+
+  const s3TestClient = new S3Client({
+    endpoint: 'http://localstack:4566',
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: 'test',
+      secretAccessKey: 'test',
+    },
+    forcePathStyle: true,
+  });
+
+  const IPFS_BUCKET_NAME = 'ipfs-bucket';
 
   const auth: { owen1?: string; owen2?: string; validator?: string } = {};
 
@@ -65,6 +80,7 @@ describe('AppController', () => {
               SECRETS_PATH: 'secrets-path',
               ENVIRONMENT: 'test',
               DDEX_SEQUENCER_ADDRESS: await fixture.sequencer.getAddress(),
+              IPFS_BUCKET_NAME,
             }),
           ],
           isGlobal: true,
@@ -83,6 +99,7 @@ describe('AppController', () => {
     (storachaService as any)._client = storachaMock;
     (storachaService as any).loadProofParser = proofParserMock;
 
+    s3Client = module.get(S3Client);
     dataSource = module.get(DataSource);
     factory = getFactory(dataSource);
     spacesRepo = dataSource.getRepository(Space);
@@ -105,6 +122,7 @@ describe('AppController', () => {
         walletAddress: fixture.wallets.owen2.address.toLowerCase(),
       },
     ]);
+    await recreateBucket(s3TestClient, IPFS_BUCKET_NAME);
   });
 
   afterAll(async () => {
@@ -173,6 +191,85 @@ describe('AppController', () => {
     });
 
     describe('Upload controller', () => {
+      describe('/POST w3up/file', () => {
+        it('Rejects when no file attached', async () => {
+          const res = await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .expect(400);
+
+          expect(res.text).toEqual(
+            `{"message":"File is required","error":"Bad Request","statusCode":400}`,
+          );
+        });
+
+        it('Rejects non image files', async () => {
+          const file = join(__dirname, './test.zip');
+
+          const res = await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .attach('file', file)
+            .expect(400);
+
+          expect(res.text).toEqual(
+            `{"message":"Validation failed (current file type is application/zip, expected type is image/*)","error":"Bad Request","statusCode":400}`,
+          );
+        });
+
+        it('Rejects when called by non-owen', async () => {
+          const file = join(__dirname, './test.jpeg');
+
+          const res = await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.validator)
+            .attach('file', file)
+            .expect(401);
+
+          expect(res.text).toEqual(
+            `{"message":"Only Data Providers can use this endpoint","error":"Unauthorized","statusCode":401}`,
+          );
+        });
+
+        it('Processes file', async () => {
+          const file = join(__dirname, './test.jpeg');
+
+          const expectedCID = randomCID();
+
+          storachaMock.uploadFile.mockResolvedValueOnce({
+            toString: () => expectedCID,
+          });
+
+          let fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${expectedCID}.jpeg`,
+          );
+
+          expect(fileExists).toEqual(false);
+
+          const res = await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .attach('file', file)
+            .expect(201);
+
+          expect(res.body.cid).toBeDefined();
+          expect(typeof res.body.cid).toBe('string');
+          expect(expectedCID).toEqual(res.body.cid);
+
+          expect(res.body.url).toBeDefined();
+          expect(typeof res.body.url).toBe('string');
+
+          fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${res.body.cid}.jpeg`,
+          );
+          expect(fileExists).toEqual(true);
+        });
+      });
+
       describe('/POST w3up/dir', () => {
         it('Rejects when no file attached', async () => {
           const res = await request(app.getHttpServer())
@@ -234,77 +331,40 @@ describe('AppController', () => {
 
         it('Processes zip', async () => {
           const file = join(__dirname, './test.zip');
+          const expectedCID = randomCID();
+
+          storachaMock.uploadDirectory.mockResolvedValueOnce({
+            toString: () => expectedCID,
+          });
+
+          let fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${expectedCID}.zip`,
+          );
+
+          expect(fileExists).toEqual(false);
 
           const res = await request(app.getHttpServer())
             .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
             .set('authorization', auth.validator)
-            .attach('file', file);
-
-          console.log(res.text);
-          // .expect(201);
-
-          expect(res.body.cid).toBeDefined();
-          expect(typeof res.body.cid).toBe('string');
-
-          expect(res.body.url).toBeDefined();
-          expect(typeof res.body.url).toBe('string');
-        });
-      });
-
-      describe('/POST w3up/file', () => {
-        it('Rejects when no file attached', async () => {
-          const res = await request(app.getHttpServer())
-            .post('/w3up/file')
-            .set('authorization', auth.owen1)
-            .expect(400);
-
-          expect(res.text).toEqual(
-            `{"message":"File is required","error":"Bad Request","statusCode":400}`,
-          );
-        });
-
-        it('Rejects non image files', async () => {
-          const file = join(__dirname, './test.zip');
-
-          const res = await request(app.getHttpServer())
-            .post('/w3up/file')
-            .set('authorization', auth.owen1)
-            .attach('file', file)
-            .expect(400);
-
-          expect(res.text).toEqual(
-            `{"message":"Validation failed (current file type is application/zip, expected type is image/*)","error":"Bad Request","statusCode":400}`,
-          );
-        });
-
-        it('Rejects when called by non-owen', async () => {
-          const file = join(__dirname, './test.jpeg');
-
-          const res = await request(app.getHttpServer())
-            .post('/w3up/file')
-            .set('authorization', auth.validator)
-            .attach('file', file)
-            .expect(401);
-
-          expect(res.text).toEqual(
-            `{"message":"Only Data Providers can use this endpoint","error":"Unauthorized","statusCode":401}`,
-          );
-        });
-
-        it('Processes file', async () => {
-          const file = join(__dirname, './test.jpeg');
-
-          const res = await request(app.getHttpServer())
-            .post('/w3up/file')
-            .set('authorization', auth.owen1)
             .attach('file', file)
             .expect(201);
 
           expect(res.body.cid).toBeDefined();
           expect(typeof res.body.cid).toBe('string');
+          expect(expectedCID).toEqual(res.body.cid);
 
           expect(res.body.url).toBeDefined();
           expect(typeof res.body.url).toBe('string');
+          console.log({ expectedCID, returned: `${res.body.cid}.zip` });
+
+          fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${res.body.cid}.zip`,
+          );
+          expect(fileExists).toEqual(true);
         });
       });
     });

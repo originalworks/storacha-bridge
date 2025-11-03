@@ -16,6 +16,12 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<String>
   RootDbName:
     Type: AWS::SSM::Parameter::Value<String>
+  IPFSStorageArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: ""
+  IPFSStorageName:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: ""
 
 Globals:
   Function:
@@ -43,6 +49,7 @@ Globals:
             - ":SecretString:password}}"
         DB_SYNCRONIZE: "false"
         DB_DATABASE: !Ref StorachaBridgeDBName
+        IPFS_BUCKET_NAME: !Ref IPFSStorageName
 
 Resources:
   StorachaBridgeRole:
@@ -76,7 +83,11 @@ Resources:
                 Effect: Allow
                 Resource:
                   - "*"
-
+              - Action:
+                  - s3:*
+                Effect: Allow
+                Resource:
+                  - !Sub ${IPFSStorageArn}/
   Api:
     Type: AWS::Serverless::Api
     Properties:
