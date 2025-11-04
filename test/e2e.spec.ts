@@ -194,6 +194,103 @@ describe('AppController', () => {
     });
 
     describe('Upload controller', () => {
+      describe('/POST w3up/dir', () => {
+        it('Rejects when no file attached', async () => {
+          const res = await request(app.getHttpServer())
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.validator)
+            .expect(400);
+
+          expect(res.text).toEqual(
+            `{"message":"File is required","error":"Bad Request","statusCode":400}`,
+          );
+        });
+
+        it('Rejects when no spaceOwnerAddress added or not 0x address', async () => {
+          const file = join(__dirname, './test.zip');
+
+          let res = await request(app.getHttpServer())
+            .post(`/w3up/dir`)
+            .set('authorization', auth.validator)
+            .expect(404);
+
+          res = await request(app.getHttpServer())
+            .post(`/w3up/dir/zenek-martyniuk`)
+            .set('authorization', auth.validator)
+            .attach('file', file)
+            .expect(400);
+
+          expect(res.text).toEqual(
+            `{"message":["spaceOwnerAddress must be an Ethereum address"],"error":"Bad Request","statusCode":400}`,
+          );
+        });
+
+        it('Rejects non zip files', async () => {
+          const file = join(__dirname, './test.jpeg');
+
+          const res = await request(app.getHttpServer())
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.validator)
+            .attach('file', file)
+            .expect(400);
+
+          expect(res.text).toEqual(
+            `{"message":"Validation failed (current file type is image/jpeg, expected type is application/zip)","error":"Bad Request","statusCode":400}`,
+          );
+        });
+
+        it('Rejects when called by non-validator', async () => {
+          const file = join(__dirname, './test.zip');
+
+          const res = await request(app.getHttpServer())
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.owen1)
+            .attach('file', file)
+            .expect(401);
+
+          expect(res.text).toEqual(
+            `{"message":"Only Validators can use this endpoint","error":"Unauthorized","statusCode":401}`,
+          );
+        });
+
+        it('Processes zip', async () => {
+          const file = join(__dirname, './test.zip');
+          const expectedCID = randomCID();
+
+          storachaMock.uploadDirectory.mockResolvedValueOnce({
+            toString: () => expectedCID,
+          });
+
+          let fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${expectedCID}.zip`,
+          );
+
+          expect(fileExists).toEqual(false);
+
+          const res = await request(app.getHttpServer())
+            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
+            .set('authorization', auth.validator)
+            .attach('file', file)
+            .expect(201);
+
+          expect(res.body.cid).toBeDefined();
+          expect(typeof res.body.cid).toBe('string');
+          expect(expectedCID).toEqual(res.body.cid);
+
+          expect(res.body.url).toBeDefined();
+          expect(typeof res.body.url).toBe('string');
+
+          fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${res.body.cid}.zip`,
+          );
+          expect(fileExists).toEqual(true);
+        });
+      });
+
       describe('/POST w3up/file', () => {
         it('Rejects when no file attached', async () => {
           const res = await request(app.getHttpServer())
@@ -303,103 +400,6 @@ describe('AppController', () => {
             s3TestClient,
             IPFS_BUCKET_NAME,
             `${res.body.cid}.jpeg`,
-          );
-          expect(fileExists).toEqual(true);
-        });
-      });
-
-      describe('/POST w3up/dir', () => {
-        it('Rejects when no file attached', async () => {
-          const res = await request(app.getHttpServer())
-            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
-            .set('authorization', auth.validator)
-            .expect(400);
-
-          expect(res.text).toEqual(
-            `{"message":"File is required","error":"Bad Request","statusCode":400}`,
-          );
-        });
-
-        it('Rejects when no spaceOwnerAddress added or not 0x address', async () => {
-          const file = join(__dirname, './test.zip');
-
-          let res = await request(app.getHttpServer())
-            .post(`/w3up/dir`)
-            .set('authorization', auth.validator)
-            .expect(404);
-
-          res = await request(app.getHttpServer())
-            .post(`/w3up/dir/zenek-martyniuk`)
-            .set('authorization', auth.validator)
-            .attach('file', file)
-            .expect(400);
-
-          expect(res.text).toEqual(
-            `{"message":["spaceOwnerAddress must be an Ethereum address"],"error":"Bad Request","statusCode":400}`,
-          );
-        });
-
-        it('Rejects non zip files', async () => {
-          const file = join(__dirname, './test.jpeg');
-
-          const res = await request(app.getHttpServer())
-            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
-            .set('authorization', auth.validator)
-            .attach('file', file)
-            .expect(400);
-
-          expect(res.text).toEqual(
-            `{"message":"Validation failed (current file type is image/jpeg, expected type is application/zip)","error":"Bad Request","statusCode":400}`,
-          );
-        });
-
-        it('Rejects when called by non-validator', async () => {
-          const file = join(__dirname, './test.zip');
-
-          const res = await request(app.getHttpServer())
-            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
-            .set('authorization', auth.owen1)
-            .attach('file', file)
-            .expect(401);
-
-          expect(res.text).toEqual(
-            `{"message":"Only Validators can use this endpoint","error":"Unauthorized","statusCode":401}`,
-          );
-        });
-
-        it('Processes zip', async () => {
-          const file = join(__dirname, './test.zip');
-          const expectedCID = randomCID();
-
-          storachaMock.uploadDirectory.mockResolvedValueOnce({
-            toString: () => expectedCID,
-          });
-
-          let fileExists = await existsInBucket(
-            s3TestClient,
-            IPFS_BUCKET_NAME,
-            `${expectedCID}.zip`,
-          );
-
-          expect(fileExists).toEqual(false);
-
-          const res = await request(app.getHttpServer())
-            .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
-            .set('authorization', auth.validator)
-            .attach('file', file)
-            .expect(201);
-
-          expect(res.body.cid).toBeDefined();
-          expect(typeof res.body.cid).toBe('string');
-          expect(expectedCID).toEqual(res.body.cid);
-
-          expect(res.body.url).toBeDefined();
-          expect(typeof res.body.url).toBe('string');
-
-          fileExists = await existsInBucket(
-            s3TestClient,
-            IPFS_BUCKET_NAME,
-            `${res.body.cid}.zip`,
           );
           expect(fileExists).toEqual(true);
         });
