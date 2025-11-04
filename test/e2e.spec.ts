@@ -20,6 +20,9 @@ import { DataSource, Repository } from 'typeorm';
 import { Factory, getFactory, randomCID, randomDID } from './factory';
 import { Space } from '../src/storacha/storacha.entity';
 import { clearDatabase } from './typeorm.utils';
+import { S3Client } from '@aws-sdk/client-s3';
+import { recreateBucket, existsInBucket } from './s3Utils';
+import { UploadService } from '../src/upload/upload.service';
 
 describe('AppController', () => {
   let factory: Factory;
@@ -27,6 +30,19 @@ describe('AppController', () => {
   let dataSource: DataSource;
   let fixture: Awaited<ReturnType<typeof testFixture>>;
   let spacesRepo: Repository<Space>;
+  let uploadService: UploadService;
+
+  const s3TestClient = new S3Client({
+    endpoint: 'http://localstack:4566',
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: 'test',
+      secretAccessKey: 'test',
+    },
+    forcePathStyle: true,
+  });
+
+  const IPFS_BUCKET_NAME = 'ipfs-bucket';
 
   const auth: { owen1?: string; owen2?: string; validator?: string } = {};
 
@@ -65,6 +81,8 @@ describe('AppController', () => {
               SECRETS_PATH: 'secrets-path',
               ENVIRONMENT: 'test',
               DDEX_SEQUENCER_ADDRESS: await fixture.sequencer.getAddress(),
+              IPFS_BUCKET_NAME,
+              BACKUP_TO_IPFS_NODE: true,
             }),
           ],
           isGlobal: true,
@@ -86,6 +104,7 @@ describe('AppController', () => {
     dataSource = module.get(DataSource);
     factory = getFactory(dataSource);
     spacesRepo = dataSource.getRepository(Space);
+    uploadService = module.get(UploadService);
     app = module.createNestApplication();
 
     app.useGlobalPipes(
@@ -105,6 +124,8 @@ describe('AppController', () => {
         walletAddress: fixture.wallets.owen2.address.toLowerCase(),
       },
     ]);
+
+    await recreateBucket(s3TestClient, IPFS_BUCKET_NAME);
   });
 
   afterAll(async () => {
@@ -234,20 +255,39 @@ describe('AppController', () => {
 
         it('Processes zip', async () => {
           const file = join(__dirname, './test.zip');
+          const expectedCID = randomCID();
+
+          storachaMock.uploadDirectory.mockResolvedValueOnce({
+            toString: () => expectedCID,
+          });
+
+          let fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${expectedCID}.zip`,
+          );
+
+          expect(fileExists).toEqual(false);
 
           const res = await request(app.getHttpServer())
             .post(`/w3up/dir/${fixture.wallets.owen1.address}`)
             .set('authorization', auth.validator)
-            .attach('file', file);
-
-          console.log(res.text);
-          // .expect(201);
+            .attach('file', file)
+            .expect(201);
 
           expect(res.body.cid).toBeDefined();
           expect(typeof res.body.cid).toBe('string');
+          expect(expectedCID).toEqual(res.body.cid);
 
           expect(res.body.url).toBeDefined();
           expect(typeof res.body.url).toBe('string');
+
+          fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${res.body.cid}.zip`,
+          );
+          expect(fileExists).toEqual(true);
         });
       });
 
@@ -291,8 +331,57 @@ describe('AppController', () => {
           );
         });
 
+        it('Assumes file extension if its missing', async () => {
+          const file = join(__dirname, './test');
+
+          const uploadServiceSpy = jest.spyOn(uploadService, 'uploadFile');
+
+          await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .attach('file', file, {
+              contentType: 'image/jpeg',
+            })
+            .expect(201);
+
+          expect(uploadServiceSpy).toHaveBeenCalledWith(
+            expect.stringMatching(/\.(jpe?g)$/),
+            expect.any(Object),
+          );
+
+          uploadServiceSpy.mockReset();
+          await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .attach('file', file, {
+              contentType: 'image/unknownmime',
+            })
+            .expect(201);
+
+          expect(uploadServiceSpy).toHaveBeenCalledWith(
+            expect.stringMatching(/\/test$/),
+            expect.any(Object),
+          );
+
+          uploadServiceSpy.mockRestore();
+        });
+
         it('Processes file', async () => {
           const file = join(__dirname, './test.jpeg');
+
+          const expectedCID = randomCID();
+
+          storachaMock.uploadFile.mockResolvedValueOnce({
+            toString: () => expectedCID,
+          });
+
+          let fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${expectedCID}.jpeg`,
+          );
+
+          expect(fileExists).toEqual(false);
 
           const res = await request(app.getHttpServer())
             .post('/w3up/file')
@@ -302,9 +391,17 @@ describe('AppController', () => {
 
           expect(res.body.cid).toBeDefined();
           expect(typeof res.body.cid).toBe('string');
+          expect(expectedCID).toEqual(res.body.cid);
 
           expect(res.body.url).toBeDefined();
           expect(typeof res.body.url).toBe('string');
+
+          fileExists = await existsInBucket(
+            s3TestClient,
+            IPFS_BUCKET_NAME,
+            `${res.body.cid}.jpeg`,
+          );
+          expect(fileExists).toEqual(true);
         });
       });
     });
