@@ -25,7 +25,7 @@ export class UploadService {
       const extractPath = await this.unzip(filepath);
       const res = await this.storachaService.uploadZip(extractPath, authInfo);
 
-      if (this.configService.get('ENVIRONMENT') === 'prod') {
+      if (this.configService.get('BACKUP_TO_IPFS_NODE')) {
         await this.s3Service.uploadFile({
           bucketName: this.configService.get('IPFS_BUCKET_NAME'),
           filePath: filepath,
@@ -69,7 +69,7 @@ export class UploadService {
     try {
       const res = await this.storachaService.uploadFile(filepath, authInfo);
 
-      if (this.configService.get('ENVIRONMENT') === 'prod') {
+      if (this.configService.get('BACKUP_TO_IPFS_NODE')) {
         await this.s3Service.uploadFile({
           bucketName: this.configService.get('IPFS_BUCKET_NAME'),
           filePath: filepath,

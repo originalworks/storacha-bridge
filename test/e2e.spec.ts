@@ -8,7 +8,7 @@ import { HDNodeWallet } from 'ethers';
 import { ConfigModule } from '@nestjs/config';
 import { rm } from 'fs/promises';
 import { ClientType } from '../src/auth/auth.interface';
-import { sleep, testFixture } from './fixture';
+import { testFixture } from './fixture';
 import { IConfig } from '../src/config/config';
 import { StorachaService } from '../src/storacha/storacha.service';
 import { Secrets } from '../src/awsSecrets/awsSecrets.module';
@@ -22,6 +22,7 @@ import { Space } from '../src/storacha/storacha.entity';
 import { clearDatabase } from './typeorm.utils';
 import { S3Client } from '@aws-sdk/client-s3';
 import { recreateBucket, existsInBucket } from './s3Utils';
+import { UploadService } from '../src/upload/upload.service';
 
 describe('AppController', () => {
   let factory: Factory;
@@ -29,7 +30,7 @@ describe('AppController', () => {
   let dataSource: DataSource;
   let fixture: Awaited<ReturnType<typeof testFixture>>;
   let spacesRepo: Repository<Space>;
-  let s3Client: S3Client;
+  let uploadService: UploadService;
 
   const s3TestClient = new S3Client({
     endpoint: 'http://localstack:4566',
@@ -81,6 +82,7 @@ describe('AppController', () => {
               ENVIRONMENT: 'test',
               DDEX_SEQUENCER_ADDRESS: await fixture.sequencer.getAddress(),
               IPFS_BUCKET_NAME,
+              BACKUP_TO_IPFS_NODE: true,
             }),
           ],
           isGlobal: true,
@@ -99,10 +101,10 @@ describe('AppController', () => {
     (storachaService as any)._client = storachaMock;
     (storachaService as any).loadProofParser = proofParserMock;
 
-    s3Client = module.get(S3Client);
     dataSource = module.get(DataSource);
     factory = getFactory(dataSource);
     spacesRepo = dataSource.getRepository(Space);
+    uploadService = module.get(UploadService);
     app = module.createNestApplication();
 
     app.useGlobalPipes(
@@ -122,6 +124,7 @@ describe('AppController', () => {
         walletAddress: fixture.wallets.owen2.address.toLowerCase(),
       },
     ]);
+
     await recreateBucket(s3TestClient, IPFS_BUCKET_NAME);
   });
 
@@ -229,6 +232,41 @@ describe('AppController', () => {
           expect(res.text).toEqual(
             `{"message":"Only Data Providers can use this endpoint","error":"Unauthorized","statusCode":401}`,
           );
+        });
+
+        it('Assumes file extension if its missing', async () => {
+          const file = join(__dirname, './test');
+
+          const uploadServiceSpy = jest.spyOn(uploadService, 'uploadFile');
+
+          await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .attach('file', file, {
+              contentType: 'image/jpeg',
+            })
+            .expect(201);
+
+          expect(uploadServiceSpy).toHaveBeenCalledWith(
+            expect.stringMatching(/\.(jpe?g)$/),
+            expect.any(Object),
+          );
+
+          uploadServiceSpy.mockReset();
+          await request(app.getHttpServer())
+            .post('/w3up/file')
+            .set('authorization', auth.owen1)
+            .attach('file', file, {
+              contentType: 'image/unknownmime',
+            })
+            .expect(201);
+
+          expect(uploadServiceSpy).toHaveBeenCalledWith(
+            expect.stringMatching(/\/test$/),
+            expect.any(Object),
+          );
+
+          uploadServiceSpy.mockRestore();
         });
 
         it('Processes file', async () => {
@@ -357,7 +395,6 @@ describe('AppController', () => {
 
           expect(res.body.url).toBeDefined();
           expect(typeof res.body.url).toBe('string');
-          console.log({ expectedCID, returned: `${res.body.cid}.zip` });
 
           fileExists = await existsInBucket(
             s3TestClient,

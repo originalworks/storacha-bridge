@@ -18,10 +18,11 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<String>
   IPFSStorageArn:
     Type: AWS::SSM::Parameter::Value<String>
-    Default: ""
   IPFSStorageName:
     Type: AWS::SSM::Parameter::Value<String>
-    Default: ""
+
+Conditions:
+  IsProd: !Equals [ !Ref Environment, "prod" ]
 
 Globals:
   Function:
@@ -50,6 +51,7 @@ Globals:
         DB_SYNCRONIZE: "false"
         DB_DATABASE: !Ref StorachaBridgeDBName
         IPFS_BUCKET_NAME: !Ref IPFSStorageName
+        BACKUP_TO_IPFS_NODE: !If [ IsProd, "true", "false" ]
 
 Resources:
   StorachaBridgeRole:
@@ -87,7 +89,8 @@ Resources:
                   - s3:*
                 Effect: Allow
                 Resource:
-                  - !Sub ${IPFSStorageArn}/
+                   - !Ref IPFSStorageArn
+                   - !Sub "${IPFSStorageArn}/*"
   Api:
     Type: AWS::Serverless::Api
     Properties:

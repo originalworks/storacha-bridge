@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Injectable, Logger } from '@nestjs/common';
 import { PinoLoggerDecorator } from '../pinoLogger/logger';
-import mime from 'mime';
+import mime from 'mime-types';
 import { basename, extname } from 'path';
 import { createReadStream } from 'fs';
 import type { IUploadFile } from './s3.types';
@@ -26,6 +26,13 @@ export class S3Service {
     const originalExt = extname(filePath);
     const originalFileName = basename(filePath);
     const destKey = `${key ?? originalFileName}${originalExt}`;
+
+    S3Service.logger.log({
+      contentType,
+      originalExt,
+      originalFileName,
+      destKey,
+    });
 
     if (!overwrite) {
       try {
